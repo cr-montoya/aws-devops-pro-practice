@@ -1,0 +1,23 @@
+#!/bin/sh
+set -e
+
+echo "[pre-commit] running terraform fmt on staged files"
+
+if command -v terraform >/dev/null 2>&1; then
+  # Get list of staged .tf and .tfvars files
+  STAGED_TF_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(tf|tfvars)$' || true)
+
+  if [ -n "$STAGED_TF_FILES" ]; then
+    echo "$STAGED_TF_FILES" | xargs -r terraform fmt
+    
+    # Re-stage the formatted files
+    echo "$STAGED_TF_FILES" | xargs -r git add
+    echo "[pre-commit] terraform fmt completed and re-staged"
+  else
+    echo "[pre-commit] no terraform files staged, skipping"
+  fi
+else
+  echo "[pre-commit] terraform not found in PATH — skipping terraform fmt"
+fi
+
+exit 0

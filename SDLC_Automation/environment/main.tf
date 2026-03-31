@@ -40,7 +40,7 @@ module "ec2" {
   source = "../../modules/ec2"
 
   name                  = "${local.app_name}-instance"
-  ami                   = var.ami_id
+  ami                   = "ami-03ea746da1a2e36e7" # Amazon Linux
   instance_type         = "t3.micro"
   subnet_id             = module.vpc.public_subnet_id
   security_group_ids    = [module.security_group.security_group_id]

@@ -151,6 +151,9 @@ Resources:
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/standard:7.0
         Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: S3_BUCKET
+            Value: !Ref ArtifactsBucket
       Source:
         Type: CODEPIPELINE
         BuildSpec: SAM/buildspec.yml
@@ -227,8 +230,8 @@ Resources:
                 ActionMode: CHANGE_SET_REPLACE
                 StackName: task-application-dev
                 ChangeSetName: task-application-dev-changeset
-                TemplatePath: BuildArtifact::SAM/template.yaml
-                Capabilities: CAPABILITY_IAM
+                TemplatePath: BuildArtifact::SAM/packaged-template.yaml
+                Capabilities: CAPABILITY_IAM,CAPABILITY_AUTO_EXPAND
                 ParameterOverrides: '{"Stage": "dev"}'
                 RoleArn: !GetAtt CloudFormationDeployRole.Arn
               InputArtifacts:
@@ -273,8 +276,8 @@ Resources:
                 ActionMode: CHANGE_SET_REPLACE
                 StackName: task-application-prod
                 ChangeSetName: task-application-prod-changeset
-                TemplatePath: BuildArtifact::SAM/template.yaml
-                Capabilities: CAPABILITY_IAM
+                TemplatePath: BuildArtifact::SAM/packaged-template.yaml
+                Capabilities: CAPABILITY_IAM,CAPABILITY_AUTO_EXPAND
                 ParameterOverrides: '{"Stage": "prod"}'
                 RoleArn: !GetAtt CloudFormationDeployRole.Arn
               InputArtifacts:

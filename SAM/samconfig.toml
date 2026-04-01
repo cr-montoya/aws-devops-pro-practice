@@ -1,14 +1,40 @@
 version = 0.1
 
 [default.deploy.parameters]
-stack_name = "task-application"
+stack_name = "task-application-prod"
 resolve_s3 = true
-s3_prefix = "task-application"
+s3_prefix = "task-application-prod"
 region = "us-east-2"
-confirm_changeset = true
+confirm_changeset = false
 capabilities = "CAPABILITY_IAM"
 parameter_overrides = "Stage=\"prod\""
 image_repositories = []
 
 [default.global.parameters]
+region = "us-east-2"
+
+[dev.deploy.parameters]
+stack_name = "task-application-dev"
+resolve_s3 = true
+s3_prefix = "task-application-dev"
+region = "us-east-2"
+confirm_changeset = false
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "Stage=\"dev\""
+image_repositories = []
+
+[dev.global.parameters]
+region = "us-east-2"
+
+[prod.deploy.parameters]
+stack_name = "task-application-prod"
+resolve_s3 = true
+s3_prefix = "task-application-prod"
+region = "us-east-2"
+confirm_changeset = false
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "Stage=\"prod\""
+image_repositories = []
+
+[prod.global.parameters]
 region = "us-east-2"

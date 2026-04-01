@@ -1,0 +1,50 @@
+version: 0.2
+
+# phases: Define los pasos que CodeBuild ejecuta en orden
+phases:
+
+  # FASE 1: install
+  # Qué hace: Prepara el ambiente, instala herramientas y dependencias
+  install:
+    runtime-versions:
+      python: 3.12  # CodeBuild usa Python 3.12 como runtime
+    commands:
+      # Instala las dependencias necesarias para correr los tests
+      # (boto3, moto, pytest, requests - del archivo requirements.txt)
+      - pip install -r tests/unit/requirements.txt
+
+  # FASE 2: pre_build
+  # Qué hace: Valida el código ANTES de hacer build (fail-fast)
+  # Si los tests fallan aquí, el pipeline se detiene y no sigue a sam build
+  pre_build:
+    commands:
+      - echo "Running unit tests..."
+      # Corre TODOS los tests de la carpeta tests/unit/
+      # Si alguno falla → CodeBuild retorna exit code != 0 → pipeline STOP
+      - cd SAM && python3 -m unittest discover tests/unit/ -v
+
+  # FASE 3: build
+  # Qué hace: Empaqueta la aplicación SAM
+  # sam build:
+  #   - Lee template.yaml
+  #   - Instala dependencias de cada Lambda (si tienen requirements.txt)
+  #   - Prepara todo en .aws-sam/build/
+  build:
+    commands:
+      - echo "Building SAM application..."
+      - sam build
+
+  # FASE 4: post_build (opcional)
+  # Qué hace: Ejecuta comandos DESPUÉS del build
+  # En este caso solo un echo, pero podrías hacer más cosas
+  post_build:
+    commands:
+      - echo "Build complete"
+
+# artifacts: Define QUÉ archivos guarda CodeBuild como output
+# Estos son los archivos que pasan al siguiente stage del pipeline
+artifacts:
+  files:
+    - SAM/**/*           # Todo en el directorio SAM/
+    - SAM/template.yaml  # Específicamente el template (el que CloudFormation va a desplegar)
+  base-directory: .     # La ruta relativa es desde la raíz del repo

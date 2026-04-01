@@ -1,0 +1,43 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  dop-serverless-2026
+
+Parameters:
+  Stage:
+    Type: String
+    AllowedValues:
+      - dev
+      - qa
+      - prod
+    Description: The stage of the application (e.g., qa, prod)
+
+Resources:
+  TaskApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub "task-api-${Stage}"
+      StageName: !Ref Stage
+  
+  HealthCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Health check endpoint for the application
+      CodeUri: src/health_check/
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Events:
+        HealthCheck:
+          Type: Api
+          Properties:
+              RestApiId: !Ref TaskApi
+              Path: /health
+              Method: get
+    Tags:
+      - Key: lambda:createdBy
+        Value: SAM
+
+Outputs:
+  TaskApiUrl:
+    Description: URL for the Task API
+    Value: !Sub "https://${TaskApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/${Stage}/"

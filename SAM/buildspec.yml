@@ -24,20 +24,24 @@ phases:
       - python3 -m unittest discover tests/unit/ -v
 
   # FASE 3: build
-  # Qué hace: Empaqueta la aplicación SAM
+  # Qué hace: Compila y empaqueta la aplicación SAM
   # sam build:
   #   - Lee template.yaml
   #   - Instala dependencias de cada Lambda (si tienen requirements.txt)
   #   - Prepara todo en .aws-sam/build/
+  # sam package:
+  #   - Sube el código Lambda a S3
+  #   - Reemplaza los CodeUri locales por URIs S3 válidas (s3://bucket/key)
+  #   - Genera packaged-template.yaml listo para CloudFormation
   build:
     commands:
       - echo "Building SAM application..."
       - ls -al
       - sam build
+      - sam package --s3-bucket $S3_BUCKET --output-template-file packaged-template.yaml
 
   # FASE 4: post_build (opcional)
   # Qué hace: Ejecuta comandos DESPUÉS del build
-  # En este caso solo un echo, pero podrías hacer más cosas
   post_build:
     commands:
       - echo "Build complete"
@@ -46,6 +50,6 @@ phases:
 # Estos son los archivos que pasan al siguiente stage del pipeline
 artifacts:
   files:
-    - SAM/**/*           # Todo en el directorio SAM/
-    - SAM/template.yaml  # Específicamente el template (el que CloudFormation va a desplegar)
-  base-directory: .     # La ruta relativa es desde la raíz del repo
+    - SAM/**/*                    # Todo en el directorio SAM/
+    - SAM/packaged-template.yaml  # Template empaquetado con CodeUri apuntando a S3
+  base-directory: .              # La ruta relativa es desde la raíz del repo

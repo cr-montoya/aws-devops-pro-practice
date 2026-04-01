@@ -1,19 +1,6 @@
 version = 0.1
 
 [default.deploy.parameters]
-stack_name = "sam-app"
-resolve_s3 = true
-s3_prefix = "sam-app"
-region = "us-east-2"
-confirm_changeset = true
-capabilities = "CAPABILITY_IAM"
-parameter_overrides = "Stage=\"dev\""
-image_repositories = []
-
-[default.global.parameters]
-region = "us-east-2"
-
-[prod.deploy.parameters]
 stack_name = "task-application"
 resolve_s3 = true
 s3_prefix = "task-application"
@@ -23,5 +10,5 @@ capabilities = "CAPABILITY_IAM"
 parameter_overrides = "Stage=\"prod\""
 image_repositories = []
 
-[prod.global.parameters]
+[default.global.parameters]
 region = "us-east-2"

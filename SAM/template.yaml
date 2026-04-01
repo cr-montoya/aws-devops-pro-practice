@@ -18,7 +18,22 @@ Resources:
     Properties:
       Name: !Sub "task-api-${Stage}"
       StageName: !Ref Stage
-  
+      Cors:
+        AllowMethods: "'GET,POST,PUT,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Api-Key'"
+        AllowOrigin: "'*'"
+      Auth:
+        ApiKeyRequired: true
+        UsagePlan:
+          CreateUsagePlan: PER_API
+          UsagePlanName: !Sub "task-api-usage-plan-${Stage}"
+          Quota:
+            Limit: 1000
+            Period: DAY
+          Throttle:
+            BurstLimit: 50
+            RateLimit: 10
+
   HealthCheckFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -33,9 +48,121 @@ Resources:
               RestApiId: !Ref TaskApi
               Path: /health
               Method: get
-    Tags:
-      - Key: lambda:createdBy
-        Value: SAM
+      Tags:
+        createdBy: SAM
+
+  CreateTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Create task endpoint for the application
+      CodeUri: src/create_task/
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TaskDynamoDBTable
+      Events:
+        CreateTask:
+          Type: Api
+          Properties:
+              RestApiId: !Ref TaskApi
+              Path: /create_task
+              Method: post
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TaskDynamoDBTable
+      Tags:
+        createdBy: SAM
+        stage: !Ref Stage
+
+  GetTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Get a single task by task_id
+      CodeUri: src/get_task/
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TaskDynamoDBTable
+      Events:
+        GetTask:
+          Type: Api
+          Properties:
+              RestApiId: !Ref TaskApi
+              Path: /tasks/{task_id}
+              Method: get
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TaskDynamoDBTable
+      Tags:
+        createdBy: SAM
+        stage: !Ref Stage
+
+  ListTasksFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: List all tasks
+      CodeUri: src/list_task/
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TaskDynamoDBTable
+      Events:
+        ListTask:
+          Type: Api
+          Properties:
+              RestApiId: !Ref TaskApi
+              Path: /tasks
+              Method: get
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TaskDynamoDBTable
+      Tags:
+        createdBy: SAM
+        stage: !Ref Stage
+
+  UpdateTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Update the status of an existing task
+      CodeUri: src/update_task/
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TaskDynamoDBTable
+      Events:
+        UpdateTask:
+          Type: Api
+          Properties:
+              RestApiId: !Ref TaskApi
+              Path: /tasks/{task_id}
+              Method: put
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TaskDynamoDBTable
+      Tags:
+        createdBy: SAM
+        stage: !Ref Stage
+
+  TaskDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "tasks-${Stage}"
+      AttributeDefinitions:
+        - AttributeName: task_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: task_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      Tags:
+        - Key: createdBy
+          Value: SAM
+        - Key: stage
+          Value: !Ref Stage
 
 Outputs:
   TaskApiUrl:

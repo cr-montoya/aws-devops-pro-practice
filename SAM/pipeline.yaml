@@ -88,8 +88,8 @@ Resources:
                 Resource: !GetAtt CloudFormationDeployRole.Arn
               - Effect: Allow
                 Action:
-                  - codestarconnections:UseConnection
-                Resource: !Sub "arn:aws:codestar-connections:${AWS::Region}:${AWS::AccountId}:connection/*"
+                  - codeconnections:UseConnection
+                Resource: !Sub "arn:aws:codeconnections:${AWS::Region}:${AWS::AccountId}:connection/*"
               - Effect: Allow
                 Action:
                   - sns:Publish
@@ -302,7 +302,7 @@ Outputs:
 
   GitHubConnectionArn:
     Description: GitHub Connection ARN (manually activate in console)
-    Value: !Sub "arn:aws:codestar-connections:${AWS::Region}:${AWS::AccountId}:connection/${GitHubConnection.ConnectionArn}"
+    Value: !GetAtt GitHubConnection.ConnectionArn
 
   ApprovalTopic:
     Description: SNS Topic for approval notifications

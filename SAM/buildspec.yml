@@ -11,8 +11,7 @@ phases:
     commands:
       # Instala las dependencias necesarias para correr los tests
       # (boto3, moto, pytest, requests - del archivo requirements.txt)
-      - ls -al
-      - cd SAM && pip install -r tests/unit/requirements.txt
+      - cd SAM && pip install -r tests/requirements.txt
 
   # FASE 2: pre_build
   # Qué hace: Valida el código ANTES de hacer build (fail-fast)

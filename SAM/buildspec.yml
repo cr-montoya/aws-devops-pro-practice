@@ -11,7 +11,8 @@ phases:
     commands:
       # Instala las dependencias necesarias para correr los tests
       # (boto3, moto, pytest, requests - del archivo requirements.txt)
-      - pip install -r tests/unit/requirements.txt
+      - ls -al
+      - cd SAM && pip install -r tests/unit/requirements.txt
 
   # FASE 2: pre_build
   # Qué hace: Valida el código ANTES de hacer build (fail-fast)
@@ -21,6 +22,7 @@ phases:
       - echo "Running unit tests..."
       # Corre TODOS los tests de la carpeta tests/unit/
       # Si alguno falla → CodeBuild retorna exit code != 0 → pipeline STOP
+      - ls -al
       - cd SAM && python3 -m unittest discover tests/unit/ -v
 
   # FASE 3: build
@@ -32,6 +34,7 @@ phases:
   build:
     commands:
       - echo "Building SAM application..."
+      - ls -al
       - sam build
 
   # FASE 4: post_build (opcional)

@@ -21,8 +21,7 @@ phases:
       - echo "Running unit tests..."
       # Corre TODOS los tests de la carpeta tests/unit/
       # Si alguno falla → CodeBuild retorna exit code != 0 → pipeline STOP
-      - ls -al
-      - cd SAM && python3 -m unittest discover tests/unit/ -v
+      - python3 -m unittest discover tests/unit/ -v
 
   # FASE 3: build
   # Qué hace: Empaqueta la aplicación SAM

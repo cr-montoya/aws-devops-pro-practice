@@ -71,7 +71,6 @@ Resources:
               - Effect: Allow
                 Action:
                   - codebuild:BatchGetBuilds
-                  - codebuild:BatchGetBuildsReports
                   - codebuild:StartBuild
                 Resource: !GetAtt CodeBuildProject.Arn
               - Effect: Allow
@@ -89,7 +88,10 @@ Resources:
               - Effect: Allow
                 Action:
                   - codeconnections:UseConnection
-                Resource: !Sub "arn:aws:codeconnections:${AWS::Region}:${AWS::AccountId}:connection/*"
+                  - codestar-connections:UseConnection
+                Resource:
+                  - !GetAtt GitHubConnection.ConnectionArn
+                  - !Sub "arn:aws:codeconnections:${AWS::Region}:${AWS::AccountId}:connection/*"
               - Effect: Allow
                 Action:
                   - sns:Publish

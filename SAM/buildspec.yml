@@ -7,7 +7,7 @@ phases:
   # Purpose: Prepares the environment, installs tools and dependencies
   install:
     runtime-versions:
-      python: 3.12  # CodeBuild uses Python 3.12 as the runtime
+      python: 3.12
     commands:
       # Install dependencies required to run tests
       # (boto3, moto, pytest, requests - from requirements.txt)
@@ -36,7 +36,6 @@ phases:
   build:
     commands:
       - echo "Building SAM application..."
-      - ls -al
       - sam build
       - sam package --s3-bucket $S3_BUCKET --output-template-file packaged-template.yaml
 
@@ -50,6 +49,6 @@ phases:
 # These files are passed to the next stage of the pipeline
 artifacts:
   files:
-    - SAM/**/*                    # Everything in the SAM/ directory
-    - SAM/packaged-template.yaml  # Packaged template with CodeUri pointing to S3
-  base-directory: .              # Relative path is from the repo root
+    - SAM/**/*
+    - SAM/packaged-template.yaml
+  base-directory: .

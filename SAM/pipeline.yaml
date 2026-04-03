@@ -12,10 +12,9 @@ Parameters:
 
   GitHubBranch:
     Type: String
-    Default: serverless
+    Default: main
     AllowedValues:
       - main
-      - serverless
     Description: GitHub branch to deploy from
 
   ApprovalEmail:

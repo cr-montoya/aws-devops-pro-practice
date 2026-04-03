@@ -9,7 +9,7 @@ class TestCreateTask(unittest.TestCase):
 
     @mock_aws
     def test_create_task_success(self):
-        # Paso 1: Setup - Crear tabla fake
+        # Step 1: Setup - Create mock DynamoDB table
         dynamodb = boto3.resource('dynamodb', region_name='us-east-2')
         dynamodb.create_table(
             TableName='Tasks-${Stage}',
@@ -22,15 +22,15 @@ class TestCreateTask(unittest.TestCase):
             BillingMode='PAY_PER_REQUEST'
         )
 
-        # Paso 2: Preparar el event
+        # Step 2: Prepare the Lambda event
         event = {
             'body': json.dumps({'title': 'Learn SAM'})
         }
 
-        # Paso 3: Llamar la Lambda
+        # Step 3: Call the Lambda handler
         response = lambda_handler(event, None)
 
-        # Paso 4: Assertions
+        # Step 4: Assertions
         self.assertEqual(response['statusCode'], 201)
         body = json.loads(response['body'])
         self.assertEqual(body['title'], 'Learn SAM')
@@ -40,7 +40,7 @@ class TestCreateTask(unittest.TestCase):
 
     @mock_aws
     def test_create_task_no_title(self):
-        # Setup - Crear tabla fake
+        # Setup - Create mock DynamoDB table
         dynamodb = boto3.resource('dynamodb', region_name='us-east-2')
         dynamodb.create_table(
             TableName='Tasks-${Stage}',
@@ -53,12 +53,12 @@ class TestCreateTask(unittest.TestCase):
             BillingMode='PAY_PER_REQUEST'
         )
 
-        # Event sin title
+        # Event without title
         event = {
             'body': json.dumps({})
         }
 
-        # Call lambda
+        # Call Lambda handler
         response = lambda_handler(event, None)
 
         # Assertions
@@ -69,7 +69,7 @@ class TestCreateTask(unittest.TestCase):
 
     @mock_aws
     def test_create_task_duplicate_title(self):
-        # Setup - Crear tabla fake
+        # Setup - Create mock DynamoDB table
         dynamodb = boto3.resource('dynamodb', region_name='us-east-2')
         dynamodb.create_table(
             TableName='Tasks-${Stage}',
@@ -82,14 +82,14 @@ class TestCreateTask(unittest.TestCase):
             BillingMode='PAY_PER_REQUEST'
         )
 
-        # Event 1: Crear "Learn SAM"
+        # Event 1: Create "Learn SAM"
         event = {
             'body': json.dumps({'title': 'Learn SAM'})
         }
         response1 = lambda_handler(event, None)
         self.assertEqual(response1['statusCode'], 201)
 
-        # Event 2: Intentar crear "Learn SAM" de nuevo
+        # Event 2: Try to create "Learn SAM" again
         response2 = lambda_handler(event, None)
 
         # Assertions

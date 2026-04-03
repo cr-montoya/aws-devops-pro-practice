@@ -1,38 +1,38 @@
 version: 0.2
 
-# phases: Define los pasos que CodeBuild ejecuta en orden
+# phases: Define the steps that CodeBuild executes in order
 phases:
 
-  # FASE 1: install
-  # Qué hace: Prepara el ambiente, instala herramientas y dependencias
+  # PHASE 1: install
+  # Purpose: Prepares the environment, installs tools and dependencies
   install:
     runtime-versions:
-      python: 3.12  # CodeBuild usa Python 3.12 como runtime
+      python: 3.12  # CodeBuild uses Python 3.12 as the runtime
     commands:
-      # Instala las dependencias necesarias para correr los tests
-      # (boto3, moto, pytest, requests - del archivo requirements.txt)
+      # Install dependencies required to run tests
+      # (boto3, moto, pytest, requests - from requirements.txt)
       - cd SAM && pip install -r tests/requirements.txt
 
-  # FASE 2: pre_build
-  # Qué hace: Valida el código ANTES de hacer build (fail-fast)
-  # Si los tests fallan aquí, el pipeline se detiene y no sigue a sam build
+  # PHASE 2: pre_build
+  # Purpose: Validates code BEFORE building (fail-fast)
+  # If tests fail here, pipeline stops and skips sam build
   pre_build:
     commands:
       - echo "Running unit tests..."
-      # Corre TODOS los tests de la carpeta tests/unit/
-      # Si alguno falla → CodeBuild retorna exit code != 0 → pipeline STOP
+      # Runs ALL tests in tests/unit/
+      # If any fail → CodeBuild returns exit code != 0 → pipeline STOPS
       - python3 -m unittest discover tests/unit/ -v
 
-  # FASE 3: build
-  # Qué hace: Compila y empaqueta la aplicación SAM
+  # PHASE 3: build
+  # Purpose: Compiles and packages the SAM application
   # sam build:
-  #   - Lee template.yaml
-  #   - Instala dependencias de cada Lambda (si tienen requirements.txt)
-  #   - Prepara todo en .aws-sam/build/
+  #   - Reads template.yaml
+  #   - Installs dependencies for each Lambda (if they have requirements.txt)
+  #   - Prepares everything in .aws-sam/build/
   # sam package:
-  #   - Sube el código Lambda a S3
-  #   - Reemplaza los CodeUri locales por URIs S3 válidas (s3://bucket/key)
-  #   - Genera packaged-template.yaml listo para CloudFormation
+  #   - Uploads Lambda code to S3
+  #   - Replaces local CodeUri with valid S3 URIs (s3://bucket/key)
+  #   - Generates packaged-template.yaml ready for CloudFormation
   build:
     commands:
       - echo "Building SAM application..."
@@ -40,16 +40,16 @@ phases:
       - sam build
       - sam package --s3-bucket $S3_BUCKET --output-template-file packaged-template.yaml
 
-  # FASE 4: post_build (opcional)
-  # Qué hace: Ejecuta comandos DESPUÉS del build
+  # PHASE 4: post_build (optional)
+  # Purpose: Executes commands AFTER the build completes
   post_build:
     commands:
       - echo "Build complete"
 
-# artifacts: Define QUÉ archivos guarda CodeBuild como output
-# Estos son los archivos que pasan al siguiente stage del pipeline
+# artifacts: Defines WHICH files CodeBuild saves as output
+# These files are passed to the next stage of the pipeline
 artifacts:
   files:
-    - SAM/**/*                    # Todo en el directorio SAM/
-    - SAM/packaged-template.yaml  # Template empaquetado con CodeUri apuntando a S3
-  base-directory: .              # La ruta relativa es desde la raíz del repo
+    - SAM/**/*                    # Everything in the SAM/ directory
+    - SAM/packaged-template.yaml  # Packaged template with CodeUri pointing to S3
+  base-directory: .              # Relative path is from the repo root

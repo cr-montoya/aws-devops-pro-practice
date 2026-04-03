@@ -1,0 +1,54 @@
+version: 0.2
+
+# phases: Define the steps that CodeBuild executes in order
+phases:
+
+  # PHASE 1: install
+  # Purpose: Prepares the environment, installs tools and dependencies
+  install:
+    runtime-versions:
+      python: 3.12
+    commands:
+      # Install dependencies required to run tests
+      # (boto3, moto, pytest, requests - from requirements.txt)
+      - cd SAM && pip install -r tests/requirements.txt
+
+  # PHASE 2: pre_build
+  # Purpose: Validates code BEFORE building (fail-fast)
+  # If tests fail here, pipeline stops and skips sam build
+  pre_build:
+    commands:
+      - echo "Running unit tests..."
+      # Runs ALL tests in tests/unit/
+      # If any fail → CodeBuild returns exit code != 0 → pipeline STOPS
+      - python3 -m unittest discover tests/unit/ -v
+
+  # PHASE 3: build
+  # Purpose: Compiles and packages the SAM application
+  # sam build:
+  #   - Reads template.yaml
+  #   - Installs dependencies for each Lambda (if they have requirements.txt)
+  #   - Prepares everything in .aws-sam/build/
+  # sam package:
+  #   - Uploads Lambda code to S3
+  #   - Replaces local CodeUri with valid S3 URIs (s3://bucket/key)
+  #   - Generates packaged-template.yaml ready for CloudFormation
+  build:
+    commands:
+      - echo "Building SAM application..."
+      - sam build
+      - sam package --s3-bucket $S3_BUCKET --output-template-file packaged-template.yaml
+
+  # PHASE 4: post_build (optional)
+  # Purpose: Executes commands AFTER the build completes
+  post_build:
+    commands:
+      - echo "Build complete"
+
+# artifacts: Defines WHICH files CodeBuild saves as output
+# These files are passed to the next stage of the pipeline
+artifacts:
+  files:
+    - SAM/**/*
+    - SAM/packaged-template.yaml
+  base-directory: .

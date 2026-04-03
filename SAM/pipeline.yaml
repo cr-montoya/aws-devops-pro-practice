@@ -1,0 +1,313 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CI/CD Pipeline for Task API SAM Application
+
+Parameters:
+  GitHubOwner:
+    Type: String
+    Description: GitHub repository owner (username)
+
+  GitHubRepo:
+    Type: String
+    Description: GitHub repository name
+
+  GitHubBranch:
+    Type: String
+    Default: main
+    AllowedValues:
+      - main
+    Description: GitHub branch to deploy from
+
+  ApprovalEmail:
+    Type: String
+    Description: Email address to receive approval notifications
+
+Resources:
+  # ===== S3 BUCKET FOR PIPELINE ARTIFACTS =====
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "task-api-artifacts-${AWS::AccountId}"
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # ===== GITHUB CONNECTION (CodeStar) =====
+  # IMPORTANT: Must be manually activated in AWS Console after deployment
+  GitHubConnection:
+    Type: AWS::CodeStarConnections::Connection
+    Properties:
+      ConnectionName: task-api-github-connection
+      ProviderType: GitHub
+
+  # ===== IAM ROLES =====
+
+  # Role for CodePipeline
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: PipelinePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:GetObjectVersion
+                Resource: !Sub "${ArtifactsBucket.Arn}/*"
+              - Effect: Allow
+                Action:
+                  - codebuild:BatchGetBuilds
+                  - codebuild:StartBuild
+                Resource: !GetAtt CodeBuildProject.Arn
+              - Effect: Allow
+                Action:
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:ExecuteChangeSet
+                Resource: !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*"
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource: !GetAtt CloudFormationDeployRole.Arn
+              - Effect: Allow
+                Action:
+                  - codeconnections:UseConnection
+                  - codestar-connections:UseConnection
+                Resource:
+                  - !GetAtt GitHubConnection.ConnectionArn
+                  - !Sub "arn:aws:codeconnections:${AWS::Region}:${AWS::AccountId}:connection/*"
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref ApprovalNotificationTopic
+
+  # Role for CodeBuild
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodeBuildPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub "${ArtifactsBucket.Arn}/*"
+
+  # Role for CloudFormation (Deploy)
+  CloudFormationDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+  # ===== CODEBUILD PROJECT =====
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: task-api-build
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: S3_BUCKET
+            Value: !Ref ArtifactsBucket
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: SAM/buildspec.yml
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Sub "/aws/codebuild/${AWS::StackName}"
+
+  # ===== SNS TOPIC FOR APPROVALS =====
+  ApprovalNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: task-api-approval-notifications
+
+
+  ApprovalNotificationSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      TopicArn: !Ref ApprovalNotificationTopic
+      Endpoint: !Ref ApprovalEmail
+  # ===== CODEPIPELINE =====
+  TaskApiPipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: task-api-pipeline
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactsBucket
+      Stages:
+        # ===== STAGE 1: SOURCE =====
+        - Name: Source
+          Actions:
+            - Name: GitHubSource
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeStarSourceConnection
+                Version: '1'
+              Configuration:
+                FullRepositoryId: !Sub "${GitHubOwner}/${GitHubRepo}"
+                BranchName: !Ref GitHubBranch
+                ConnectionArn: !GetAtt GitHubConnection.ConnectionArn
+              OutputArtifacts:
+                - Name: SourceArtifact
+
+        # ===== STAGE 2: BUILD =====
+        - Name: Build
+          Actions:
+            - Name: CodeBuildAction
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              InputArtifacts:
+                - Name: SourceArtifact
+              OutputArtifacts:
+                - Name: BuildArtifact
+
+        # ===== STAGE 3: DEPLOY TO DEV (AUTOMATIC) =====
+        - Name: DeployDev
+          Actions:
+            - Name: CreateChangeSetDev
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              Configuration:
+                ActionMode: CHANGE_SET_REPLACE
+                StackName: task-application-dev
+                ChangeSetName: task-application-dev-changeset
+                TemplatePath: BuildArtifact::SAM/packaged-template.yaml
+                Capabilities: CAPABILITY_IAM,CAPABILITY_AUTO_EXPAND
+                ParameterOverrides: '{"Stage": "dev"}'
+                RoleArn: !GetAtt CloudFormationDeployRole.Arn
+              InputArtifacts:
+                - Name: BuildArtifact
+              RunOrder: 1
+
+            - Name: ExecuteChangeSetDev
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              Configuration:
+                ActionMode: CHANGE_SET_EXECUTE
+                StackName: task-application-dev
+                ChangeSetName: task-application-dev-changeset
+              RunOrder: 2
+
+        # ===== STAGE 4: MANUAL APPROVAL =====
+        - Name: Approval
+          Actions:
+            - Name: ManualApprovalProd
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: '1'
+              Configuration:
+                CustomData: "Review changes and approve to deploy to production"
+                NotificationArn: !Ref ApprovalNotificationTopic
+
+        # ===== STAGE 5: DEPLOY TO PROD (WITH CANARY) =====
+        - Name: DeployProd
+          Actions:
+            - Name: CreateChangeSetProd
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              Configuration:
+                ActionMode: CHANGE_SET_REPLACE
+                StackName: task-application-prod
+                ChangeSetName: task-application-prod-changeset
+                TemplatePath: BuildArtifact::SAM/packaged-template.yaml
+                Capabilities: CAPABILITY_IAM,CAPABILITY_AUTO_EXPAND
+                ParameterOverrides: '{"Stage": "prod"}'
+                RoleArn: !GetAtt CloudFormationDeployRole.Arn
+              InputArtifacts:
+                - Name: BuildArtifact
+              RunOrder: 1
+
+            - Name: ExecuteChangeSetProd
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              Configuration:
+                ActionMode: CHANGE_SET_EXECUTE
+                StackName: task-application-prod
+                ChangeSetName: task-application-prod-changeset
+              RunOrder: 2
+
+Outputs:
+  PipelineName:
+    Description: Name of the CodePipeline
+    Value: !Ref TaskApiPipeline
+
+  ArtifactsBucketName:
+    Description: S3 bucket for pipeline artifacts
+    Value: !Ref ArtifactsBucket
+
+  GitHubConnectionArn:
+    Description: GitHub Connection ARN (manually activate in console)
+    Value: !GetAtt GitHubConnection.ConnectionArn
+
+  ApprovalTopic:
+    Description: SNS Topic for approval notifications
+    Value: !Ref ApprovalNotificationTopic

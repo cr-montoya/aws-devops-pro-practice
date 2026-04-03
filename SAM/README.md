@@ -25,17 +25,23 @@ A simple serverless task management API built with AWS SAM, demonstrating best p
 
 ```
 SAM/
-├── src/
-│   ├── health_check/        # Health check endpoint
-│   ├── create_task/         # Create a new task
-│   ├── get_task/            # Get a single task by ID
-│   ├── list_task/           # List all tasks
-│   └── update_task/         # Update task status
-├── tests/
-│   └── unit/                # Unit tests for all functions
-├── template.yaml            # SAM template (infrastructure as code)
-├── samconfig.toml           # SAM deployment configuration
-└── swagger.json             # API documentation
+├── src/                          # Lambda function code
+│   ├── health_check/             # Health check endpoint
+│   ├── create_task/              # Create a new task
+│   ├── get_task/                 # Get a single task by ID
+│   ├── list_task/                # List all tasks
+│   └── update_task/              # Update task status
+├── tests/                        # Test suite
+│   ├── unit/                     # Unit tests for all functions
+│   └── requirements.txt          # Test dependencies
+├── events/                       # Sample Lambda events for local testing
+├── template.yaml                 # SAM template (infrastructure as code)
+├── samconfig.toml                # SAM deployment configuration (dev/prod profiles)
+├── buildspec.yml                 # CodeBuild build specification (CI/CD)
+├── pipeline.yaml                 # CodePipeline infrastructure template
+├── requirements.txt              # Application dependencies
+├── swagger.json                  # API documentation
+└── README.md                     # This file
 ```
 
 ## API Endpoints
@@ -100,11 +106,31 @@ sam build
 # Deploy locally (without pipeline)
 sam deploy --profile dev
 
-# Test locally
+# Test locally with API Gateway emulation
 sam local start-api  # http://localhost:3000
 
 # Delete a stack
 sam delete
+```
+
+### Test Locally with Sample Events
+
+Use the sample events in `events/` to test each endpoint:
+
+```bash
+# Start local API server (in one terminal)
+sam local start-api
+
+# In another terminal, test endpoints with the sample events
+sam local invoke HealthCheckFunction -e events/health_check.json
+sam local invoke CreateTaskFunction -e events/create_task.json
+sam local invoke GetTaskFunction -e events/get_task.json
+sam local invoke ListTasksFunction -e events/list_tasks.json
+sam local invoke UpdateTaskFunction -e events/update_task.json
+
+# Or use curl against the local API
+curl http://localhost:3000/health \
+  -H "x-api-key: test-key"
 ```
 
 ### Deploy Pipeline Stack (One-time Setup)
@@ -130,10 +156,10 @@ Then manually activate the GitHub connection in AWS Console:
 ### After Activation
 
 Just push to the `serverless` branch—the pipeline triggers automatically:
-- ✅ Tests run in CodeBuild
-- ✅ Dev deploys automatically
-- ✅ Prod requires manual approval
-- ✅ Prod uses canary deployment (safer rollouts)
+- Tests run in CodeBuild
+- Dev deploys automatically
+- Prod requires manual approval
+- Prod uses canary deployment (safer rollouts)
 
 ## Testing Endpoints
 

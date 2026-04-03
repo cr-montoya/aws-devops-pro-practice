@@ -1,0 +1,10 @@
+{
+  "httpMethod": "GET",
+  "path": "/tasks/abc-123",
+  "pathParameters": {
+    "task_id": "abc-123"
+  },
+  "headers": {
+    "x-api-key": "test-key"
+  }
+}

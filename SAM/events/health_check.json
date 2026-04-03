@@ -1,0 +1,7 @@
+{
+  "httpMethod": "GET",
+  "path": "/health",
+  "headers": {
+    "x-api-key": "test-key"
+  }
+}

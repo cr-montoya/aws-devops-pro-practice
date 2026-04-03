@@ -1,0 +1,9 @@
+{
+  "httpMethod": "POST",
+  "path": "/create_task",
+  "headers": {
+    "x-api-key": "test-key",
+    "Content-Type": "application/json"
+  },
+  "body": "{\"title\": \"Learn AWS SAM\"}"
+}

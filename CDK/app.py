@@ -3,6 +3,7 @@ import aws_cdk as cdk
 from stacks.networking_stack import NetworkingStack
 from stacks.storage_stack import StorageStack
 from stacks.streaming_stack import StreamingStack
+from stacks.compute_stack import ComputeStack
 
 app = cdk.App()
 env = cdk.Environment(region="us-east-2")
@@ -36,6 +37,17 @@ streaming = StreamingStack(
     stage=stage,
     storage_stack=storage,
     description="Kinesis Data Streams and Firehose for real-time event processing",
+    env=env
+)
+
+compute = ComputeStack(
+    app, "Compute",
+    app_name=app_name,
+    stage=stage,
+    networking_stack=networking,
+    storage_stack=storage,
+    streaming_stack=streaming,
+    description="ECS Fargate service with FastAPI admin panel and ALB",
     env=env
 )
 

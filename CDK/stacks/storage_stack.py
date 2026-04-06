@@ -6,7 +6,15 @@ from constructs import Construct
 
 class StorageStack(cdk.Stack):
 
-    def __init__(self, scope: Construct, construct_id: str, app_name: str, stage: str, component: str, **kwargs) -> None:
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        app_name: str,
+        stage: str,
+        component: str,
+        **kwargs
+    ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         self.table = dynamodb.Table(self, "Table",

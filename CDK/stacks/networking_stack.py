@@ -4,7 +4,14 @@ from constructs import Construct
 
 class NetworkingStack(cdk.Stack):
 
-    def __init__(self, scope: Construct, construct_id: str, app_name: str, stage: str, **kwargs) -> None:
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        app_name: str,
+        stage: str,
+        **kwargs
+    ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         self.vpc = ec2.Vpc(self, "Vpc",

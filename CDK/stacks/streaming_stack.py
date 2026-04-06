@@ -9,7 +9,15 @@ from constructs import Construct
 
 class StreamingStack(cdk.Stack):
 
-    def __init__(self, scope: Construct, construct_id: str, app_name: str, stage: str, storage_stack, **kwargs) -> None:
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        app_name: str,
+        stage: str,
+        storage_stack: "StorageStack",
+        **kwargs
+    ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         self.stream = kinesis.Stream(self, "Stream",

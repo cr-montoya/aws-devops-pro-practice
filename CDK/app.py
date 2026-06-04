@@ -3,6 +3,7 @@ import aws_cdk as cdk
 from stacks.networking_stack import NetworkingStack
 from stacks.storage_stack import StorageStack
 from stacks.streaming_stack import StreamingStack
+from stacks.processing_stack import ProcessingStack
 from stacks.compute_stack import ComputeStack
 
 app = cdk.App()
@@ -37,6 +38,16 @@ streaming = StreamingStack(
     stage=stage,
     storage_stack=storage,
     description="Kinesis Data Streams and Firehose for real-time event processing",
+    env=env
+)
+
+processing = ProcessingStack(
+    app, "Processing",
+    app_name=app_name,
+    stage=stage,
+    streaming_stack=streaming,
+    storage_stack=storage,
+    description="Lambda stream processor (KDS -> DynamoDB) with SQS DLQ and X-Ray tracing",
     env=env
 )
 

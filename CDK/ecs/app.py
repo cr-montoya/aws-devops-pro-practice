@@ -47,6 +47,10 @@ async def startup_event():
     print(f"API initialized. Stream: {STREAM_NAME}, Region: {AWS_REGION}")
 
 
+@app.get("/")
+async def root():
+    return RedirectResponse(url="/docs")
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}

@@ -5,6 +5,8 @@ from stacks.storage_stack import StorageStack
 from stacks.streaming_stack import StreamingStack
 from stacks.processing_stack import ProcessingStack
 from stacks.compute_stack import ComputeStack
+from stacks.observability_stack import ObservabilityStack
+from stacks.incident_response_stack import IncidentResponseStack
 
 app = cdk.App()
 env = cdk.Environment(region="us-east-2")
@@ -13,6 +15,7 @@ env = cdk.Environment(region="us-east-2")
 app_name = "orders"
 stage = "dev"
 component = "kinesis-archive"
+alert_emails = ["cristianmontoyar27@gmail.com"]
 
 # Stacks
 networking = NetworkingStack(
@@ -61,5 +64,32 @@ compute = ComputeStack(
     description="ECS Fargate service with FastAPI admin panel and ALB",
     env=env
 )
+
+observability = ObservabilityStack(
+    app, "Observability",
+    app_name=app_name,
+    stage=stage,
+    processing_stack=processing,
+    streaming_stack=streaming,
+    storage_stack=storage,
+    compute_stack=compute,
+    alert_emails=alert_emails,
+    description="CloudWatch alarms, dashboard, log retention, and X-Ray for orders pipeline",
+    env=env
+)
+observability.add_dependency(processing)
+observability.add_dependency(compute)
+
+incident_response = IncidentResponseStack(
+    app, "IncidentResponse",
+    app_name=app_name,
+    stage=stage,
+    processing_stack=processing,
+    observability_stack=observability,
+    compute_stack=compute,
+    description="EventBridge rules, SNS alerts, and DLQ auto-remediation Lambda",
+    env=env
+)
+incident_response.add_dependency(observability)
 
 app.synth()

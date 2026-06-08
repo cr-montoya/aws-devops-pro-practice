@@ -20,6 +20,7 @@ class StorageStack(cdk.Stack):
         self.table = dynamodb.Table(self, "Table",
             table_name=f"{app_name}-{stage}-table",
             partition_key=dynamodb.Attribute(name="id", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.DESTROY,
             deletion_protection=False
         )

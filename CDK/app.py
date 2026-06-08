@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 import os
+from dotenv import load_dotenv
 import aws_cdk as cdk
+
+load_dotenv()  # loads .env if present; no-op if file doesn't exist (e.g. CI/CD)
 from stacks.networking_stack import NetworkingStack
 from stacks.storage_stack import StorageStack
 from stacks.streaming_stack import StreamingStack

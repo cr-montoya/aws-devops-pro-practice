@@ -1,6 +1,7 @@
 import aws_cdk as cdk
 from aws_cdk import pipelines
 from aws_cdk import aws_codebuild as codebuild
+from aws_cdk import aws_ssm as ssm
 from constructs import Construct
 from stacks.app_stage import AppStage
 
@@ -10,36 +11,45 @@ class PipelineStack(cdk.Stack):
     Self-mutating CDK Pipeline: GitHub -> dev (automatic) -> manual approval -> prod.
 
     The pipeline updates itself on every run (self_mutation=True by default).
-    Changing this stack and pushing to main is enough to update the pipeline definition.
+    Changing this stack and pushing triggers it to update itself before deploying the app.
 
-    Prerequisites before deploying:
-      1. Create a GitHub CodeStar Connection in AWS Console (CodePipeline -> Settings -> Connections)
-         and set it to "Available" status. Copy the ARN into app.py.
-      2. Run `cdk deploy Pipeline` once manually to bootstrap the pipeline.
-         From then on, pushes to main trigger the pipeline automatically.
+    Prerequisites (one-time setup before first deploy):
+      1. Create SSM parameters with your personal values (see .env.example for names)
+      2. Create a GitHub CodeStar Connection in AWS Console and set it to "Available"
+      3. Run `cdk deploy Pipeline` once manually to bootstrap the pipeline
     """
 
     def __init__(
         self,
         scope: Construct,
         construct_id: str,
-        github_owner: str,
         github_repo: str,
         github_branch: str,
-        codestar_connection_arn: str,
         app_name: str,
         component: str,
-        dev_alert_emails: list,
-        prod_alert_emails: list,
         **kwargs
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        # Read personal/account-specific values from SSM Parameter Store at synth time.
+        # value_from_lookup resolves immediately (not via CloudFormation) and caches the
+        # result in cdk.context.json (gitignored). CodeBuild reads SSM via its IAM role.
+        github_owner = ssm.StringParameter.value_from_lookup(
+            self, "/orders/pipeline/github_owner"
+        )
+        codestar_arn = ssm.StringParameter.value_from_lookup(
+            self, "/orders/pipeline/codestar_connection_arn"
+        )
+        alert_emails_str = ssm.StringParameter.value_from_lookup(
+            self, "/orders/pipeline/alert_emails"
+        )
+        alert_emails = [e.strip() for e in alert_emails_str.split(",") if e.strip()]
 
         # Source: GitHub via CodeStar Connection (OAuth-based, no personal tokens needed)
         source = pipelines.CodePipelineSource.connection(
             f"{github_owner}/{github_repo}",
             github_branch,
-            connection_arn=codestar_connection_arn
+            connection_arn=codestar_arn
         )
 
         # Synth step: installs deps and runs `cdk synth` from the CDK/ subdirectory.
@@ -92,7 +102,7 @@ class PipelineStack(cdk.Stack):
                 app_name=app_name,
                 stage="dev",
                 component=component,
-                alert_emails=dev_alert_emails,
+                alert_emails=alert_emails,
                 env=cdk.Environment(account=self.account, region=self.region)
             ),
             pre=[unit_tests]
@@ -105,7 +115,7 @@ class PipelineStack(cdk.Stack):
                 app_name=app_name,
                 stage="prod",
                 component=component,
-                alert_emails=prod_alert_emails,
+                alert_emails=alert_emails,
                 env=cdk.Environment(account=self.account, region=self.region)
             ),
             pre=[

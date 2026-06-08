@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 import os
 from dotenv import load_dotenv
-import aws_cdk as cdk
 
 load_dotenv()  # loads .env if present; no-op if file doesn't exist (e.g. CI/CD)
+
+import aws_cdk as cdk
 from stacks.networking_stack import NetworkingStack
 from stacks.storage_stack import StorageStack
 from stacks.streaming_stack import StreamingStack
@@ -23,7 +24,10 @@ stage       = os.environ.get("STAGE", "dev")
 component   = os.environ.get("COMPONENT", "kinesis-archive")
 alert_emails = [e.strip() for e in os.environ.get("ALERT_EMAILS", "").split(",") if e.strip()]
 
-env = cdk.Environment(region=aws_region)
+env = cdk.Environment(
+    account=os.environ.get("CDK_DEFAULT_ACCOUNT"),
+    region=os.environ.get("CDK_DEFAULT_REGION", aws_region)
+)
 
 # --- Individual stacks (for direct cdk deploy during development) ---
 
@@ -108,14 +112,10 @@ incident_response.add_dependency(observability)
 #   3. Run `cdk deploy Pipeline` once manually — after that, pushes to main trigger it automatically
 pipeline = PipelineStack(
     app, "Pipeline",
-    github_owner=os.environ.get("GITHUB_OWNER", "GITHUB_OWNER_NOT_SET"),
     github_repo=app.node.try_get_context("github_repo"),
     github_branch=app.node.try_get_context("github_branch"),
-    codestar_connection_arn=os.environ.get("CODESTAR_CONNECTION_ARN", "CODESTAR_CONNECTION_ARN_NOT_SET"),
     app_name=app_name,
     component=component,
-    dev_alert_emails=alert_emails,
-    prod_alert_emails=alert_emails,
     description="Self-mutating CDK Pipeline: GitHub -> dev -> manual approval -> prod",
     env=env
 )

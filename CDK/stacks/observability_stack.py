@@ -24,18 +24,23 @@ class ObservabilityStack(cdk.Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # SNS topic - shared sink for all alarms; reused by IncidentResponseStack
+        # SNS topic — single sink for all alarms and EventBridge rules.
+        # Reused by IncidentResponseStack so all notifications go through one channel.
         self.alerts_topic = sns.Topic(self, "AlertsTopic",
             topic_name=f"{app_name}-{stage}-alerts",
             display_name=f"{app_name}-{stage} Alerts"
         )
+        # Email subscriptions require manual confirmation after deploy — check inbox for AWS SNS confirmation link
         for email in alert_emails:
             self.alerts_topic.add_subscription(subscriptions.EmailSubscription(email))
 
         sns_action = cw_actions.SnsAction(self.alerts_topic)
 
         # --- Alarms ---
+        # TreatMissingData.NOT_BREACHING: no traffic = no data = no alarm.
+        # Prevents false positives in dev when the pipeline is idle (nights/weekends).
 
+        # Any Lambda error fires immediately — stream processing errors are not expected
         lambda_errors = cloudwatch.Alarm(self, "LambdaErrors",
             alarm_name=f"{app_name}-{stage}-lambda-errors",
             metric=processing_stack.processor.metric_errors(
@@ -49,6 +54,7 @@ class ObservabilityStack(cdk.Stack):
         )
         lambda_errors.add_alarm_action(sns_action)
 
+        # p95 at 45s warns before hard timeout at 60s — gives time to investigate before Lambda starts killing executions
         lambda_duration = cloudwatch.Alarm(self, "LambdaDuration",
             alarm_name=f"{app_name}-{stage}-lambda-duration-p95",
             metric=processing_stack.processor.metric_duration(
@@ -62,6 +68,7 @@ class ObservabilityStack(cdk.Stack):
         )
         lambda_duration.add_alarm_action(sns_action)
 
+        # Throttles mean Lambda hit concurrency limits — scale up reserved concurrency or reduce batch size
         lambda_throttles = cloudwatch.Alarm(self, "LambdaThrottles",
             alarm_name=f"{app_name}-{stage}-lambda-throttles",
             metric=processing_stack.processor.metric_throttles(
@@ -75,6 +82,8 @@ class ObservabilityStack(cdk.Stack):
         )
         lambda_throttles.add_alarm_action(sns_action)
 
+        # IteratorAge measures how far behind the consumer is from the tip of the stream.
+        # >= 60s over 3 evaluation periods (15 min total) means Lambda is not keeping up with producers.
         kds_iterator_age = cloudwatch.Alarm(self, "KdsIteratorAge",
             alarm_name=f"{app_name}-{stage}-kds-iterator-age",
             metric=cloudwatch.Metric(
@@ -91,6 +100,8 @@ class ObservabilityStack(cdk.Stack):
         )
         kds_iterator_age.add_alarm_action(sns_action)
 
+        # Any message in the DLQ means Lambda exhausted all retries on a record.
+        # This fires immediately (threshold=1) — DLQ depth should always be 0.
         dlq_depth = cloudwatch.Alarm(self, "DlqDepth",
             alarm_name=f"{app_name}-{stage}-dlq-depth",
             metric=cloudwatch.Metric(
@@ -107,6 +118,8 @@ class ObservabilityStack(cdk.Stack):
         )
         dlq_depth.add_alarm_action(sns_action)
 
+        # 5xx from target means the FastAPI container is returning errors (not ALB itself).
+        # Threshold of 5 avoids alerting on transient single errors.
         alb_5xx = cloudwatch.Alarm(self, "Alb5xx",
             alarm_name=f"{app_name}-{stage}-alb-5xx",
             metric=cloudwatch.Metric(
@@ -126,20 +139,20 @@ class ObservabilityStack(cdk.Stack):
         alb_5xx.add_alarm_action(sns_action)
 
         # --- Log retention ---
-        # LogRetention uses a custom resource to set retention on existing log groups
-        # without recreating them - CDK does not set retention by default
-
+        # CDK does not set retention on log groups by default (they stay forever).
+        # LogRetention uses a custom resource (Lambda-backed) to call PutRetentionPolicy
+        # on existing log groups without recreating them.
         logs.LogRetention(self, "LambdaLogRetention",
             log_group_name=f"/aws/lambda/{processing_stack.processor.function_name}",
             retention=logs.RetentionDays.ONE_MONTH
         )
-
         logs.LogRetention(self, "EcsLogRetention",
             log_group_name=f"/ecs/{app_name}-{stage}-web-service",
             retention=logs.RetentionDays.ONE_MONTH
         )
 
-        # --- Dashboard (24-column grid, width=8 → 3 per row, width=12 → 2 per row) ---
+        # --- Dashboard ---
+        # 24-column grid: width=8 fits 3 widgets per row, width=12 fits 2 per row
 
         dashboard = cloudwatch.Dashboard(self, "Dashboard",
             dashboard_name=f"{app_name}-{stage}-dashboard"

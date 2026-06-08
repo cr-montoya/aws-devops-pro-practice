@@ -21,7 +21,10 @@ class IncidentResponseStack(cdk.Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # --- REQ-3: DLQ Re-driver Lambda ---
+        # --- DLQ Re-driver Lambda ---
+        # Reads up to 10 messages from the DLQ and re-invokes the processor directly.
+        # Runs on a schedule (every 5 min) so failed records are retried without manual intervention.
+        # Uses AWSLambdaBasicExecutionRole so it can write its own execution logs to CloudWatch.
 
         redriver_role = iam.Role(self, "RedriverRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
@@ -31,8 +34,7 @@ class IncidentResponseStack(cdk.Stack):
                 )
             ]
         )
-
-        # grant_consume_messages = ReceiveMessage + DeleteMessage + GetQueueAttributes
+        # grant_consume_messages grants ReceiveMessage + DeleteMessage + GetQueueAttributes
         processing_stack.dlq.grant_consume_messages(redriver_role)
         processing_stack.processor.grant_invoke(redriver_role)
 
@@ -56,10 +58,10 @@ class IncidentResponseStack(cdk.Stack):
             }
         )
 
-        # --- REQ-1: ECS Task Stopped Rule ---
-        # exists: True matches any stop with an explicit reason (crashes, OOM, health check failures)
-        # excludes graceful rolling deployment replacements where stoppedReason may be absent
-
+        # --- ECS Task Stopped Rule ---
+        # Matches any task that stopped with an explicit stoppedReason (crashes, OOM, health check failures).
+        # `exists: True` on stoppedReason excludes graceful replacements during rolling deployments
+        # where the reason field may be absent.
         ecs_task_stopped_rule = events.Rule(self, "EcsTaskStoppedRule",
             rule_name=f"{app_name}-{stage}-ecs-task-stopped",
             description="Fires when an ECS task stops unexpectedly",
@@ -83,8 +85,9 @@ class IncidentResponseStack(cdk.Stack):
             )
         )
 
-        # --- REQ-2: DLQ Poller - runs every 5 min, re-drives any messages in DLQ ---
-
+        # --- DLQ Poll Schedule ---
+        # Triggers the re-driver every 5 minutes. If the DLQ is empty, the re-driver
+        # returns immediately with no side effects. No need to check depth before triggering.
         dlq_poll_rule = events.Rule(self, "DlqPollRule",
             rule_name=f"{app_name}-{stage}-dlq-poll",
             description="Triggers DLQ re-driver every 5 minutes",
@@ -92,8 +95,9 @@ class IncidentResponseStack(cdk.Stack):
         )
         dlq_poll_rule.add_target(targets.LambdaFunction(redriver))
 
-        # --- REQ-4: Heartbeat - confirms EventBridge pipeline is alive every 15 min ---
-
+        # --- Heartbeat Schedule ---
+        # Publishes a message to SNS every 15 minutes to confirm the EventBridge bus is alive.
+        # If the heartbeat stops arriving, it means EventBridge or SNS itself has a problem.
         heartbeat_rule = events.Rule(self, "HeartbeatRule",
             rule_name=f"{app_name}-{stage}-heartbeat",
             description="Publishes heartbeat to SNS every 15 minutes",

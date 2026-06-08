@@ -127,14 +127,14 @@ Resource naming pattern: `{app_name}-{stage}-{resource}` (e.g. `orders-dev-proce
 
 ## Implementation Status
 
-✅ **Networking** — VPC multi-AZ, NACLs, prod/dev conditional (private subnets + VPC Endpoints in prod)
-✅ **Storage** — DynamoDB PAY_PER_REQUEST + S3 for Firehose archive
-✅ **Streaming** — KDS (ON_DEMAND, 24h retention) + Firehose -> S3 with date partitioning
-✅ **Compute** — ECS Fargate + ALB + FastAPI admin panel + Secrets Manager API key
-✅ **Processing** — Lambda processor (KDS -> DynamoDB), SQS DLQ via `on_failure` on event source mapping, X-Ray tracing
-✅ **Observability** — 6 CloudWatch alarms, unified dashboard, log retention, SNS topic with email subscriptions
-✅ **Incident Response** — EventBridge (ECS stopped, DLQ poll, heartbeat), DLQ re-driver Lambda
-⏳ **Pipeline** — CDK Pipelines CI/CD (dev -> prod) — pending
+- ✅ **Networking** — VPC multi-AZ, NACLs, prod/dev conditional (private subnets + VPC Endpoints in prod)
+- ✅ **Storage** — DynamoDB PAY_PER_REQUEST + S3 for Firehose archive
+- ✅ **Streaming** — KDS (ON_DEMAND, 24h retention) + Firehose -> S3 with date partitioning
+- ✅ **Compute** — ECS Fargate + ALB + FastAPI admin panel + Secrets Manager API key
+- ✅ **Processing** — Lambda processor (KDS -> DynamoDB), SQS DLQ via `on_failure` on event source mapping, X-Ray tracing
+- ✅ **Observability** — 6 CloudWatch alarms, unified dashboard, log retention, SNS topic with email subscriptions
+- ✅ **Incident Response** — EventBridge (ECS stopped, DLQ poll, heartbeat), DLQ re-driver Lambda
+- ⏳ **Pipeline** — CDK Pipelines CI/CD (dev -> prod) — pending
 
 ## AWS Domains Covered
 

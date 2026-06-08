@@ -32,6 +32,11 @@ class ProcessingStack(cdk.Stack):
         lambda_role = iam.Role(self, "ProcessorRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com")
         )
+        lambda_role.add_managed_policy(
+            iam.ManagedPolicy.from_aws_managed_policy_name(
+                "service-role/AWSLambdaBasicExecutionRole"
+            )
+        )
 
         # Grant permissions to Lambda role
         streaming_stack.stream.grant_read(lambda_role)

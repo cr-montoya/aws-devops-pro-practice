@@ -46,6 +46,7 @@ class NetworkingStack(cdk.Stack):
 
         if self.is_production:
             self._add_private_nacl(app_name, stage)
+            self._add_vpc_endpoints(app_name, stage)
 
     def _add_public_nacl(self, app_name: str, stage: str):
         nacl = ec2.NetworkAcl(self, "PublicNacl",
@@ -93,6 +94,46 @@ class NetworkingStack(cdk.Stack):
             traffic=ec2.AclTraffic.tcp_port_range(1024, 65535),
             direction=ec2.TrafficDirection.EGRESS,
             rule_action=ec2.Action.ALLOW
+        )
+
+    def _add_vpc_endpoints(self, app_name: str, stage: str):
+        private_subnets = ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED)
+
+        # Shared security group for all interface endpoints — only HTTPS from within the VPC
+        endpoints_sg = ec2.SecurityGroup(self, "EndpointsSG",
+            vpc=self.vpc,
+            security_group_name=f"{app_name}-{stage}-endpoints-sg",
+            description="Allow HTTPS from within VPC to interface endpoints",
+            allow_all_outbound=False
+        )
+        endpoints_sg.add_ingress_rule(
+            peer=ec2.Peer.ipv4(self.vpc.vpc_cidr_block),
+            connection=ec2.Port.tcp(443),
+            description="HTTPS from VPC CIDR"
+        )
+
+        # Interface endpoints — PrivateLink, billed per AZ per hour (~$7/month each)
+        for endpoint_id, service in [
+            ("EcrApiEndpoint", ec2.InterfaceVpcEndpointAwsService.ECR),
+            ("EcrDockerEndpoint", ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER),
+            ("SecretsManagerEndpoint", ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER),
+            ("CloudWatchLogsEndpoint", ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS),
+            ("KinesisEndpoint", ec2.InterfaceVpcEndpointAwsService.KINESIS_STREAMS),
+        ]:
+            ec2.InterfaceVpcEndpoint(self, endpoint_id,
+                vpc=self.vpc,
+                service=service,
+                subnets=private_subnets,
+                security_groups=[endpoints_sg],
+                private_dns_enabled=True
+            )
+
+        # Gateway endpoints — free, no security group needed
+        self.vpc.add_gateway_endpoint("S3Endpoint",
+            service=ec2.GatewayVpcEndpointAwsService.S3
+        )
+        self.vpc.add_gateway_endpoint("DynamoDbEndpoint",
+            service=ec2.GatewayVpcEndpointAwsService.DYNAMODB
         )
 
     def _add_private_nacl(self, app_name: str, stage: str):

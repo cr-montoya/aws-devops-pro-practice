@@ -22,7 +22,7 @@ networking = NetworkingStack(
     app, "Networking",
     app_name=app_name,
     stage=stage,
-    description="VPC with multi-AZ public subnets and internet gateway",
+    description="VPC with public/private isolated subnets and VPC Endpoints for ECR, S3, Secrets Manager, Logs, Kinesis (prod only)",
     env=env
 )
 

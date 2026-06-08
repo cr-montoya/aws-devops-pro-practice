@@ -7,9 +7,10 @@ AWS CDK project for practicing ECS, Kinesis, DynamoDB, and event-driven architec
 ```
 CDK/
 ├── app.py                              # Entry point — instantiates all stacks
-├── cdk.json                            # CDK configuration
+├── cdk.json                            # CDK configuration + pipeline context (repo, branch)
+├── .env.example                        # Template for local environment variables
 ├── requirements.txt                    # Production dependencies (aws-cdk-lib, constructs)
-├── requirements-dev.txt                # Dev dependencies (pytest, pytest-cov)
+├── requirements-dev.txt                # Dev dependencies (pytest, pytest-cov, python-dotenv)
 ├── stacks/
 │   ├── networking_stack.py             # VPC, subnets, NACLs, VPC Endpoints (prod)
 │   ├── storage_stack.py                # DynamoDB (PAY_PER_REQUEST) + S3
@@ -17,7 +18,9 @@ CDK/
 │   ├── processing_stack.py             # Lambda processor + SQS DLQ (on_failure)
 │   ├── compute_stack.py                # ECS Fargate + ALB + FastAPI + Secrets Manager
 │   ├── observability_stack.py          # CloudWatch Alarms, Dashboard, Log Retention, SNS
-│   └── incident_response_stack.py      # EventBridge rules + DLQ re-driver Lambda
+│   ├── incident_response_stack.py      # EventBridge rules + DLQ re-driver Lambda
+│   ├── app_stage.py                    # Groups all app stacks for pipeline deployment
+│   └── pipeline_stack.py               # Self-mutating CDK Pipeline (dev -> prod)
 ├── lambda/
 │   ├── processor.py                    # KDS stream processor -> DynamoDB (X-Ray)
 │   ├── dlq_redriver.py                 # Re-drives DLQ messages back to processor
@@ -37,44 +40,108 @@ CDK/
     └── test_incident_response_stack.py
 ```
 
-## Setup
+## First-time Setup (Pipeline Workflow)
+
+This project uses CDK Pipelines — after the initial setup, every push to the configured branch triggers an automatic deployment. You only run `cdk deploy` once.
+
+### Step 1 — Clone and install dependencies
 
 ```bash
-# Activate virtualenv
+git clone https://github.com/YOUR_USERNAME/aws-devops-pro-practice
+cd aws-devops-pro-practice/CDK
+
+python3 -m venv .venv
 source .venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
-
-# Bootstrap CDK (one-time per account/region)
-cdk bootstrap aws://ACCOUNT_ID/us-east-2
+pip install -r requirements.txt -r requirements-dev.txt
 ```
 
-## Commands
+### Step 2 — Configure local environment
 
 ```bash
+cp .env.example .env
+# Edit .env with your AWS region and any optional overrides
+```
+
+### Step 3 — Bootstrap CDK (one-time per account/region)
+
+```bash
+cdk bootstrap
+```
+
+### Step 4 — Create SSM parameters (one-time, account-specific)
+
+The pipeline reads personal/account-specific values from SSM so they never appear in the repo:
+
+```bash
+aws ssm put-parameter --region us-east-2 \
+  --name "/orders/pipeline/github_owner" \
+  --value "your-github-username" --type "String"
+
+aws ssm put-parameter --region us-east-2 \
+  --name "/orders/pipeline/codestar_connection_arn" \
+  --value "arn:aws:codeconnections:us-east-2:ACCOUNT_ID:connection/..." --type "String"
+
+aws ssm put-parameter --region us-east-2 \
+  --name "/orders/pipeline/alert_emails" \
+  --value "your@email.com" --type "String"
+```
+
+### Step 5 — Create a GitHub CodeStar Connection
+
+Go to **AWS Console → CodePipeline → Settings → Connections → Create connection**.
+Select GitHub, complete the OAuth flow, and set the status to **Available**.
+Copy the ARN into the SSM parameter created in Step 4.
+
+### Step 6 — Deploy the pipeline (one-time)
+
+```bash
+cdk deploy Pipeline
+```
+
+This creates the CodePipeline infrastructure. From this point on, **every push to the configured branch triggers a full deployment automatically**.
+
+The pipeline flow:
+```
+push to branch
+  └── Synth (cdk synth)
+        └── UnitTests (pytest) ← blocks deploy if tests fail
+              └── Dev stage (automatic)
+                    └── Manual approval
+                          └── Prod stage
+```
+
+---
+
+## Development Workflow (after setup)
+
+```bash
+# Make changes to stacks or application code
+# Run tests locally before pushing
+pytest tests/unit/ -v
+
 # Verify CloudFormation generation
 cdk synth
 
-# Run unit tests
-pytest tests/unit/ -v
+# Push — the pipeline handles the rest
+git push
+```
 
-# View differences before deploying
-cdk diff
+### Deploying individual stacks directly (optional, for faster iteration)
 
-# Deploy all stacks
-cdk deploy --all --require-approval never
-
-# Deploy a single stack
+```bash
+# Deploy a single stack without going through the pipeline
 cdk deploy Processing
 
-# Destroy all stacks
-cdk destroy --all
+# View differences before deploying
+cdk diff Networking
 
-# List all stacks
-cdk ls
+# Destroy all directly-deployed stacks
+cdk destroy --all
 ```
+
+> **Note:** Stacks deployed directly (`cdk deploy`) have different CloudFormation names than stacks deployed via the pipeline (`Pipeline-Dev-*`). They coexist independently.
+
+---
 
 ## Architecture
 
@@ -94,7 +161,7 @@ CloudWatch
   └── Log retention: Lambda + ECS (30 days)
 
 SNS: orders-dev-alerts
-  ├── Email subscriptions (configured in app.py)
+  ├── Email subscriptions (configured via SSM /orders/pipeline/alert_emails)
   └── Receives from: all CloudWatch alarms + EventBridge rules
 
 EventBridge
@@ -105,24 +172,25 @@ EventBridge
 
 ## Environment Configuration
 
-All configuration lives in `app.py`:
+Configuration is split between `cdk.json` (non-sensitive, committed) and SSM / `.env` (personal, never committed).
 
-```python
-app_name = "orders"
-stage    = "dev"       # change to "prod" to activate full production setup
-component = "kinesis-archive"
-alert_emails = ["your@email.com"]
-```
-
-Resource naming pattern: `{app_name}-{stage}-{resource}` (e.g. `orders-dev-processor`)
+| Variable | Where | Used for |
+|---|---|---|
+| `github_repo`, `github_branch` | `cdk.json` context | Pipeline source |
+| `github_owner` | SSM `/orders/pipeline/github_owner` | Pipeline source |
+| `codestar_connection_arn` | SSM `/orders/pipeline/codestar_connection_arn` | GitHub connection |
+| `alert_emails` | SSM `/orders/pipeline/alert_emails` | SNS subscriptions |
+| `AWS_REGION`, `APP_NAME`, etc. | `.env` (optional, has defaults) | Local overrides |
 
 ### dev vs prod behavior
+
+Controlled by `STAGE=dev` or `STAGE=prod` in your `.env`. The pipeline deploys both stages automatically.
 
 | | dev | prod |
 |---|---|---|
 | VPC subnets | Public only | Public + private isolated |
 | ECS task placement | Public subnet, public IP | Private subnet, no public IP |
-| VPC Endpoints | None | ECR, ECR Docker, Secrets Manager, CloudWatch Logs, Kinesis (interface) + S3, DynamoDB (gateway) |
+| VPC Endpoints | None | ECR, ECR Docker, Secrets Manager, CloudWatch Logs, Kinesis + S3, DynamoDB |
 | NACLs | Public only | Public + private |
 
 ## Implementation Status
@@ -134,14 +202,14 @@ Resource naming pattern: `{app_name}-{stage}-{resource}` (e.g. `orders-dev-proce
 - ✅ **Processing** — Lambda processor (KDS -> DynamoDB), SQS DLQ via `on_failure` on event source mapping, X-Ray tracing
 - ✅ **Observability** — 6 CloudWatch alarms, unified dashboard, log retention, SNS topic with email subscriptions
 - ✅ **Incident Response** — EventBridge (ECS stopped, DLQ poll, heartbeat), DLQ re-driver Lambda
-- ⏳ **Pipeline** — CDK Pipelines CI/CD (dev -> prod) — pending
+- ✅ **Pipeline** — Self-mutating CDK Pipelines CI/CD (dev -> prod with manual approval)
 
 ## AWS Domains Covered
 
 | Domain | Coverage |
 |---|---|
-| D1 - SDLC | CDK IaC, multi-environment, conditional infrastructure |
-| D2 - Config Management | L2 constructs, cross-stack references, BundlingOptions |
+| D1 - SDLC | CDK Pipelines, self-mutating pipeline, multi-environment promotion, manual approval gate |
+| D2 - Config Management | L2 constructs, cross-stack references, BundlingOptions, SSM Parameter Store |
 | D3 - Resilient Solutions | Multi-AZ VPC, DynamoDB PAY_PER_REQUEST, KDS retention, SQS DLQ, bisect_batch_on_error |
 | D4 - Monitoring | CloudWatch alarms, dashboard, log retention, X-Ray tracing |
 | D5 - Incident Response | EventBridge event patterns, scheduled rules, auto-remediation Lambda |

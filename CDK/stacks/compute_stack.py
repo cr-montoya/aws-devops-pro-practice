@@ -1,4 +1,5 @@
 import aws_cdk as cdk
+from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_ecs as ecs
 from aws_cdk import aws_ecs_patterns as ecs_patterns
 from aws_cdk import aws_iam as iam
@@ -46,6 +47,14 @@ class ComputeStack(cdk.Stack):
         storage_stack.table.grant_write_data(task_role)
         self.secret.grant_read(task_role)
 
+        # In prod: tasks run in private isolated subnets with no public IP
+        # In dev: tasks run in public subnets with public IP (no VPC endpoints needed)
+        task_subnets = (
+            ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED)
+            if networking_stack.is_production
+            else ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC)
+        )
+
         # ALB Fargate Service with FastAPI container
         self.service = ecs_patterns.ApplicationLoadBalancedFargateService(self, "Service",
             cluster=self.cluster,
@@ -54,7 +63,8 @@ class ComputeStack(cdk.Stack):
             desired_count=1,
             service_name=f"{app_name}-{stage}-web-service",
             load_balancer_name=f"{app_name}-{stage}-alb",
-            assign_public_ip=True,
+            assign_public_ip=not networking_stack.is_production,
+            task_subnets=task_subnets,
             task_image_options=ecs_patterns.ApplicationLoadBalancedTaskImageOptions(
                 image=ecs.ContainerImage.from_asset("ecs"),
                 container_port=8080,

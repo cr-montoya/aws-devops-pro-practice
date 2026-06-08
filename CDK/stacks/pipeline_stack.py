@@ -2,6 +2,7 @@ import aws_cdk as cdk
 from aws_cdk import pipelines
 from aws_cdk import aws_codebuild as codebuild
 from aws_cdk import aws_ssm as ssm
+from aws_cdk import aws_iam as iam
 from constructs import Construct
 from stacks.app_stage import AppStage
 
@@ -68,12 +69,26 @@ class PipelineStack(cdk.Stack):
             primary_output_directory="CDK/cdk.out"
         )
 
+        # SSM permission for the Synth CodeBuild role.
+        # value_from_lookup calls ssm:GetParameter at synth time — without this the
+        # PipelineStack fails to synthesize in CodeBuild and is excluded from the assembly,
+        # which causes the SelfMutate step to fail with "No stacks match the name(s) Pipeline".
+        ssm_policy = iam.PolicyStatement(
+            actions=["ssm:GetParameter", "ssm:GetParameters"],
+            resources=[
+                f"arn:aws:ssm:{self.region}:{self.account}:parameter/orders/pipeline/*"
+            ]
+        )
+
         # privileged=True: required for Docker builds triggered by ContainerImage.from_asset()
         # docker_enabled_for_synth=True: allows Docker during the synth step for BundlingOptions
         # cross_account_keys=False: simpler setup for same-account deployments
         pipeline = pipelines.CodePipeline(self, "Pipeline",
             pipeline_name=f"{app_name}-pipeline",
             synth=synth,
+            synth_code_build_defaults=pipelines.CodeBuildOptions(
+                role_policy=[ssm_policy]
+            ),
             code_build_defaults=pipelines.CodeBuildOptions(
                 build_environment=codebuild.BuildEnvironment(
                     build_image=codebuild.LinuxBuildImage.STANDARD_7_0,

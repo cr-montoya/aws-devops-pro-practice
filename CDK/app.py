@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import aws_cdk as cdk
 from stacks.networking_stack import NetworkingStack
 from stacks.storage_stack import StorageStack
@@ -7,17 +8,22 @@ from stacks.processing_stack import ProcessingStack
 from stacks.compute_stack import ComputeStack
 from stacks.observability_stack import ObservabilityStack
 from stacks.incident_response_stack import IncidentResponseStack
+from stacks.app_stage import AppStage
+from stacks.pipeline_stack import PipelineStack
 
 app = cdk.App()
-env = cdk.Environment(region="us-east-2")
 
-# Configuration
-app_name = "orders"
-stage = "dev"
-component = "kinesis-archive"
-alert_emails = ["cristianmontoyar27@gmail.com"]
+# --- Configuration (see .env.example) ---
+aws_region  = os.environ.get("AWS_REGION", "us-east-2")
+app_name    = os.environ.get("APP_NAME", "orders")
+stage       = os.environ.get("STAGE", "dev")
+component   = os.environ.get("COMPONENT", "kinesis-archive")
+alert_emails = [e.strip() for e in os.environ.get("ALERT_EMAILS", "").split(",") if e.strip()]
 
-# Stacks
+env = cdk.Environment(region=aws_region)
+
+# --- Individual stacks (for direct cdk deploy during development) ---
+
 networking = NetworkingStack(
     app, "Networking",
     app_name=app_name,
@@ -91,5 +97,24 @@ incident_response = IncidentResponseStack(
     env=env
 )
 incident_response.add_dependency(observability)
+
+# --- Pipeline stack (self-mutating CDK Pipeline for dev -> prod) ---
+# Prerequisites (see .env.example):
+#   1. Set GITHUB_OWNER, ALERT_EMAILS, CODESTAR_CONNECTION_ARN in your .env
+#   2. Create a GitHub CodeStar Connection in AWS Console and set it to "Available"
+#   3. Run `cdk deploy Pipeline` once manually — after that, pushes to main trigger it automatically
+pipeline = PipelineStack(
+    app, "Pipeline",
+    github_owner=os.environ.get("GITHUB_OWNER", "GITHUB_OWNER_NOT_SET"),
+    github_repo=app.node.try_get_context("github_repo"),
+    github_branch=app.node.try_get_context("github_branch"),
+    codestar_connection_arn=os.environ.get("CODESTAR_CONNECTION_ARN", "CODESTAR_CONNECTION_ARN_NOT_SET"),
+    app_name=app_name,
+    component=component,
+    dev_alert_emails=alert_emails,
+    prod_alert_emails=alert_emails,
+    description="Self-mutating CDK Pipeline: GitHub -> dev -> manual approval -> prod",
+    env=env
+)
 
 app.synth()

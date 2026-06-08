@@ -63,6 +63,7 @@ class PipelineStack(cdk.Stack):
             commands=[
                 "cd CDK",
                 "cdk synth",
+                "cp requirements.txt cdk.out/",  # needed by SelfMutate step
             ],
             primary_output_directory="CDK/cdk.out"
         )
@@ -77,6 +78,25 @@ class PipelineStack(cdk.Stack):
                 build_environment=codebuild.BuildEnvironment(
                     build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
                     privileged=True,
+                )
+            ),
+            # SelfMutate receives the cdk.out artifact and runs `cdk -a . deploy Pipeline`.
+            # It needs aws-cdk and the Python deps installed — requirements.txt was copied
+            # into cdk.out/ by the Synth step so it's available here.
+            self_mutation_code_build_defaults=pipelines.CodeBuildOptions(
+                partial_build_spec=codebuild.BuildSpec.from_object({
+                    "version": "0.2",
+                    "phases": {
+                        "install": {
+                            "commands": [
+                                "npm install -g aws-cdk",
+                                "pip install -r requirements.txt",
+                            ]
+                        }
+                    }
+                }),
+                build_environment=codebuild.BuildEnvironment(
+                    build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
                 )
             ),
             docker_enabled_for_synth=True,

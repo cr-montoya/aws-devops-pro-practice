@@ -21,7 +21,7 @@ class ProcessingStack(cdk.Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # SQS Dead Letter Queue for failed messages
+        # SQS Dead Letter Queue for stream processing failures
         dlq = sqs.Queue(self, "DLQ",
             queue_name=f"{app_name}-{stage}-dlq",
             retention_period=cdk.Duration.days(14),
@@ -43,6 +43,8 @@ class ProcessingStack(cdk.Stack):
         storage_stack.table.grant_write_data(lambda_role)
 
         # Lambda function to process KDS events
+        # Note: no dead_letter_queue here — that only applies to async invocations (SNS, S3, EventBridge).
+        # For stream-based sources (KDS), the failure destination goes on the event source mapping.
         self.processor = lambda_.Function(self, "Processor",
             function_name=f"{app_name}-{stage}-processor",
             runtime=lambda_.Runtime.PYTHON_3_12,
@@ -61,17 +63,33 @@ class ProcessingStack(cdk.Stack):
             environment={
                 "TABLE_NAME": storage_stack.table.table_name,
             },
-            dead_letter_queue=dlq,
         )
 
-        # Event source: KDS → Lambda with bisect on error
+        # Event source: KDS -> Lambda
+        # on_failure: after max_retry_attempts, the batch metadata is sent to the DLQ.
+        # bisect_batch_on_error: splits a failing batch in half to isolate the bad record faster.
         event_source = lambda_event_sources.KinesisEventSource(
             stream=streaming_stack.stream,
             batch_size=10,
             starting_position=lambda_.StartingPosition.TRIM_HORIZON,
             bisect_batch_on_error=True,
+            on_failure=lambda_event_sources.SqsDlq(dlq),
+            retry_attempts=3,
         )
         self.processor.add_event_source(event_source)
+
+        # SQS resource policy: restrict SendMessage to the Lambda service scoped to this function.
+        # grant_consume_messages (used by the re-driver) adds identity-based policies on the IAM role,
+        # but the on_failure delivery goes Lambda service -> SQS directly, so it needs a resource policy.
+        dlq.add_to_resource_policy(iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            principals=[iam.ServicePrincipal("lambda.amazonaws.com")],
+            actions=["sqs:SendMessage"],
+            resources=[dlq.queue_arn],
+            conditions={
+                "ArnEquals": {"aws:SourceArn": self.processor.function_arn}
+            }
+        ))
 
         # Expose resources for downstream stacks
         self.dlq = dlq

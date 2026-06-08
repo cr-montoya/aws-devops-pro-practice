@@ -2,6 +2,16 @@
 
 AWS CDK project for practicing ECS, Kinesis, DynamoDB, and event-driven architecture for DOP-C02 exam preparation.
 
+## Table of Contents
+
+- [Project Structure](#project-structure)
+- [First-time Setup (Pipeline Workflow)](#first-time-setup-pipeline-workflow)
+- [Development Workflow](#development-workflow-after-setup)
+- [Architecture](#architecture)
+- [Environment Configuration](#environment-configuration)
+- [Implementation Status](#implementation-status)
+- [AWS Domains Covered](#aws-domains-covered)
+
 ## Project Structure
 
 ```

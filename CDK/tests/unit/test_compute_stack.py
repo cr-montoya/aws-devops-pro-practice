@@ -42,9 +42,8 @@ def test_secret_created(app_stacks):
     template.resource_count_is("AWS::SecretsManager::Secret", 1)
 
 
-@pytest.mark.skip(reason="test stage uses public subnets (non-prod behavior) — re-enable after VPC endpoints refactor with stage=prod")
-def test_tasks_not_assigned_public_ip(app_stacks):
-    template = assertions.Template.from_stack(app_stacks["compute"])
+def test_tasks_not_assigned_public_ip(prod_stacks):
+    template = assertions.Template.from_stack(prod_stacks["compute"])
     resources = template.find_resources("AWS::ECS::Service", {
         "Properties": {
             "NetworkConfiguration": {
@@ -53,3 +52,14 @@ def test_tasks_not_assigned_public_ip(app_stacks):
         }
     })
     assert len(resources) == 0
+
+
+def test_endpoint_sg_has_task_sg_ingress(prod_stacks):
+    # CfnSecurityGroupIngress lives in the compute stack (not networking) to avoid
+    # a circular cross-stack dependency. It targets endpoints_sg.group_id via import.
+    template = assertions.Template.from_stack(prod_stacks["compute"])
+    template.has_resource_properties("AWS::EC2::SecurityGroupIngress", {
+        "FromPort": 443,
+        "ToPort": 443,
+        "IpProtocol": "tcp",
+    })

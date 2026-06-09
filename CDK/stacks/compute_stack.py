@@ -89,6 +89,24 @@ class ComputeStack(cdk.Stack):
             healthy_http_codes="200"
         )
 
+        # prod: grant the task SG explicit access to the VPC interface endpoints.
+        # The endpoints_sg already allows HTTPS from the VPC CIDR, but Fargate in
+        # PRIVATE_ISOLATED subnets requires a task-SG-scoped rule for the endpoint
+        # private DNS to resolve correctly instead of falling back to public ECR IPs.
+        #
+        # CfnSecurityGroupIngress is placed in THIS (compute) stack to avoid a
+        # circular cross-stack dependency: compute already depends on networking
+        # (VPC/subnet refs), so networking cannot also depend on compute (task SG ref).
+        if networking_stack.is_production:
+            task_sg = self.service.service.connections.security_groups[0]
+            ec2.CfnSecurityGroupIngress(self, "EndpointSgTaskIngress",
+                group_id=networking_stack.endpoints_sg.security_group_id,
+                ip_protocol="tcp",
+                from_port=443,
+                to_port=443,
+                source_security_group_id=task_sg.security_group_id,
+                description="HTTPS from ECS tasks to VPC endpoints"
+            )
 
         # Expose ALB for downstream stacks (observability alarms, incident response)
         self.alb = self.service.load_balancer

@@ -119,9 +119,18 @@ class NetworkingStack(cdk.Stack):
         )
 
         # Interface endpoints — PrivateLink, billed per AZ per hour (~$7/month each)
+        # Required for Fargate in PRIVATE_ISOLATED subnets (no internet route):
+        # - ECR API + Docker: image pull authentication and layer download
+        # - ECS + ECS Agent + ECS Telemetry: task registration, heartbeat, container insights
+        # - STS: IAM task role credential refresh (missing this causes auth failures)
+        # - Secrets Manager, CloudWatch Logs, Kinesis: application-level access
         for endpoint_id, service in [
             ("EcrApiEndpoint", ec2.InterfaceVpcEndpointAwsService.ECR),
             ("EcrDockerEndpoint", ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER),
+            ("EcsEndpoint", ec2.InterfaceVpcEndpointAwsService.ECS),
+            ("EcsAgentEndpoint", ec2.InterfaceVpcEndpointAwsService.ECS_AGENT),
+            ("EcsTelemetryEndpoint", ec2.InterfaceVpcEndpointAwsService.ECS_TELEMETRY),
+            ("StsEndpoint", ec2.InterfaceVpcEndpointAwsService.STS),
             ("SecretsManagerEndpoint", ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER),
             ("CloudWatchLogsEndpoint", ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS),
             ("KinesisEndpoint", ec2.InterfaceVpcEndpointAwsService.KINESIS_STREAMS),

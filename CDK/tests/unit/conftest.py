@@ -41,3 +41,24 @@ def app_stacks():
         "observability": observability,
         "incident_response": incident_response,
     }
+
+
+@pytest.fixture(scope="session")
+def prod_stacks():
+    """Prod-stage fixture: enables private subnets, VPC endpoints, and isolated task placement."""
+    app = cdk.App(context={"aws:cdk:bundling-stacks": []})
+    env = cdk.Environment(region="us-east-1", account="123456789012")
+
+    app_name = "orders"
+    stage = "prod"
+    component = "kinesis-archive"
+
+    networking = NetworkingStack(app, "ProdNetworking", app_name=app_name, stage=stage, env=env)
+    storage = StorageStack(app, "ProdStorage", app_name=app_name, stage=stage, component=component, env=env)
+    streaming = StreamingStack(app, "ProdStreaming", app_name=app_name, stage=stage, storage_stack=storage, env=env)
+    compute = ComputeStack(app, "ProdCompute", app_name=app_name, stage=stage, networking_stack=networking, storage_stack=storage, streaming_stack=streaming, env=env)
+
+    return {
+        "networking": networking,
+        "compute": compute,
+    }

@@ -36,10 +36,14 @@ class NetworkingStack(cdk.Stack):
                 )
             )
 
+        # enable_dns_hostnames + enable_dns_support are required for VPC endpoint private DNS
+        # to override public DNS resolution. CDK sets both by default but we make it explicit.
         self.vpc = ec2.Vpc(self, "Vpc",
             vpc_name=f"{app_name}-{stage}-vpc",
             max_azs=2,
-            subnet_configuration=subnet_config
+            subnet_configuration=subnet_config,
+            enable_dns_hostnames=True,
+            enable_dns_support=True,
         )
 
         self._add_public_nacl(app_name, stage)
@@ -99,14 +103,16 @@ class NetworkingStack(cdk.Stack):
     def _add_vpc_endpoints(self, app_name: str, stage: str):
         private_subnets = ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED)
 
-        # Shared security group for all interface endpoints — only HTTPS from within the VPC
-        endpoints_sg = ec2.SecurityGroup(self, "EndpointsSG",
+        # Shared security group for all interface endpoints.
+        # Exposed as self.endpoints_sg so ComputeStack can add the task SG as an explicit
+        # ingress rule — more specific than VPC CIDR and avoids DNS resolution issues.
+        self.endpoints_sg = ec2.SecurityGroup(self, "EndpointsSG",
             vpc=self.vpc,
             security_group_name=f"{app_name}-{stage}-endpoints-sg",
             description="Allow HTTPS from within VPC to interface endpoints",
             allow_all_outbound=False
         )
-        endpoints_sg.add_ingress_rule(
+        self.endpoints_sg.add_ingress_rule(
             peer=ec2.Peer.ipv4(self.vpc.vpc_cidr_block),
             connection=ec2.Port.tcp(443),
             description="HTTPS from VPC CIDR"
@@ -124,7 +130,7 @@ class NetworkingStack(cdk.Stack):
                 vpc=self.vpc,
                 service=service,
                 subnets=private_subnets,
-                security_groups=[endpoints_sg],
+                security_groups=[self.endpoints_sg],
                 private_dns_enabled=True
             )
 
@@ -151,6 +157,16 @@ class NetworkingStack(cdk.Stack):
             rule_number=100,
             cidr=vpc_cidr,
             traffic=ec2.AclTraffic.tcp_port(8080),
+            direction=ec2.TrafficDirection.INGRESS,
+            rule_action=ec2.Action.ALLOW
+        )
+        # Inbound: HTTPS from VPC CIDR — needed when task and endpoint ENI are in different
+        # AZs (different subnets). Traffic entering the endpoint's subnet on port 443 must be
+        # explicitly allowed. AWS routes to same-AZ endpoint when possible but not guaranteed.
+        nacl.add_entry("InboundHTTPS",
+            rule_number=105,
+            cidr=vpc_cidr,
+            traffic=ec2.AclTraffic.tcp_port(443),
             direction=ec2.TrafficDirection.INGRESS,
             rule_action=ec2.Action.ALLOW
         )

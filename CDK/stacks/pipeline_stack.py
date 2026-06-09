@@ -117,7 +117,8 @@ class PipelineStack(cdk.Stack):
                 build_environment=codebuild.BuildEnvironment(
                     build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
                     privileged=True,
-                )
+                ),
+                timeout=cdk.Duration.minutes(30),
             ),
             # SelfMutate receives the cdk.out artifact and runs `cdk -a . deploy Pipeline`.
             # It needs aws-cdk and the Python deps installed — requirements.txt was copied

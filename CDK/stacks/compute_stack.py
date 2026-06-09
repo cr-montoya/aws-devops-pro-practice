@@ -57,6 +57,8 @@ class ComputeStack(cdk.Stack):
 
         # ApplicationLoadBalancedFargateService (L3 pattern):
         # provisions ECS service + task definition + ALB + target group + listener in one construct
+        # circuit_breaker: stops deployment and rolls back after consecutive task launch failures
+        # instead of retrying for up to 3 hours (the default ECS behavior without circuit breaker)
         self.service = ecs_patterns.ApplicationLoadBalancedFargateService(self, "Service",
             cluster=self.cluster,
             cpu=256,
@@ -66,6 +68,7 @@ class ComputeStack(cdk.Stack):
             load_balancer_name=f"{app_name}-{stage}-alb",
             assign_public_ip=not networking_stack.is_production,
             task_subnets=task_subnets,
+            circuit_breaker=ecs.DeploymentCircuitBreaker(rollback=True),
             task_image_options=ecs_patterns.ApplicationLoadBalancedTaskImageOptions(
                 image=ecs.ContainerImage.from_asset("ecs"),
                 container_port=8080,
@@ -85,6 +88,7 @@ class ComputeStack(cdk.Stack):
             path="/health",
             healthy_http_codes="200"
         )
+
 
         # Expose ALB for downstream stacks (observability alarms, incident response)
         self.alb = self.service.load_balancer

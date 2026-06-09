@@ -69,16 +69,33 @@ class PipelineStack(cdk.Stack):
             primary_output_directory="CDK/cdk.out"
         )
 
-        # SSM permission for the Synth CodeBuild role.
-        # value_from_lookup calls ssm:GetParameter at synth time — without this the
-        # PipelineStack fails to synthesize in CodeBuild and is excluded from the assembly,
-        # which causes the SelfMutate step to fail with "No stacks match the name(s) Pipeline".
-        ssm_policy = iam.PolicyStatement(
-            actions=["ssm:GetParameter", "ssm:GetParameters"],
-            resources=[
-                f"arn:aws:ssm:{self.region}:{self.account}:parameter/orders/pipeline/*"
-            ]
-        )
+        # Permissions for the Synth CodeBuild role:
+        # - ssm:GetParameter: value_from_lookup calls SSM at synth time for github_owner,
+        #   codestar_arn, alert_emails. Without this the PipelineStack fails to synthesize
+        #   and is excluded from the cloud assembly (SelfMutate fails with "No stacks match").
+        # - ec2:DescribeAvailabilityZones: NetworkingStack resolves AZs at synth time via
+        #   CDK context lookup. Without this, cdk synth fails with an IAM error.
+        # - sts:AssumeRole on the CDK lookup role: CDK uses this bootstrap role to run
+        #   context lookups. If it can't assume it, it falls back to direct credentials
+        #   which also need ec2:DescribeAvailabilityZones explicitly.
+        synth_policies = [
+            iam.PolicyStatement(
+                actions=["ssm:GetParameter", "ssm:GetParameters"],
+                resources=[
+                    f"arn:aws:ssm:{self.region}:{self.account}:parameter/orders/pipeline/*"
+                ]
+            ),
+            iam.PolicyStatement(
+                actions=["ec2:DescribeAvailabilityZones"],
+                resources=["*"]
+            ),
+            iam.PolicyStatement(
+                actions=["sts:AssumeRole"],
+                resources=[
+                    f"arn:aws:iam::{self.account}:role/cdk-hnb659fds-lookup-role-{self.account}-{self.region}"
+                ]
+            ),
+        ]
 
         # privileged=True: required for Docker builds triggered by ContainerImage.from_asset()
         # docker_enabled_for_synth=True: allows Docker during the synth step for BundlingOptions
@@ -87,7 +104,15 @@ class PipelineStack(cdk.Stack):
             pipeline_name=f"{app_name}-pipeline",
             synth=synth,
             synth_code_build_defaults=pipelines.CodeBuildOptions(
-                role_policy=[ssm_policy]
+                role_policy=synth_policies,
+                partial_build_spec=codebuild.BuildSpec.from_object({
+                    "version": "0.2",
+                    "phases": {
+                        "install": {
+                            "runtime-versions": {"nodejs": 22}
+                        }
+                    }
+                })
             ),
             code_build_defaults=pipelines.CodeBuildOptions(
                 build_environment=codebuild.BuildEnvironment(

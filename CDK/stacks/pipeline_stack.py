@@ -184,3 +184,31 @@ class PipelineStack(cdk.Stack):
                 )
             ]
         )
+
+        # Teardown wave — skipped on every normal push (approval is never auto-triggered).
+        # Approve ConfirmTeardown ONLY when you want to destroy the entire lab.
+        # After destruction you will need to run `cdk deploy Pipeline` manually to start again.
+        pipeline.add_wave("TeardownLab",
+            pre=[
+                pipelines.ManualApprovalStep("ConfirmTeardown",
+                    comment=(
+                        "DESTRUCTIVE: destroys ALL stacks including this pipeline. "
+                        "Skip this on every normal push. "
+                        "After approval, run `cdk deploy Pipeline` to start again."
+                    )
+                )
+            ],
+            post=[
+                pipelines.CodeBuildStep("DestroyAll",
+                    input=source,
+                    install_commands=[
+                        "npm install -g aws-cdk",
+                        "pip install -r CDK/requirements.txt -r CDK/requirements-dev.txt",
+                    ],
+                    commands=[
+                        "cd CDK",
+                        "cdk destroy --all --force",
+                    ]
+                )
+            ]
+        )

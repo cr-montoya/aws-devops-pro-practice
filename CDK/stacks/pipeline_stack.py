@@ -69,16 +69,15 @@ class PipelineStack(cdk.Stack):
             primary_output_directory="CDK/cdk.out"
         )
 
-        # Permissions for the Synth CodeBuild role:
-        # - ssm:GetParameter: value_from_lookup calls SSM at synth time for github_owner,
-        #   codestar_arn, alert_emails. Without this the PipelineStack fails to synthesize
-        #   and is excluded from the cloud assembly (SelfMutate fails with "No stacks match").
-        # - ec2:DescribeAvailabilityZones: NetworkingStack resolves AZs at synth time via
-        #   CDK context lookup. Without this, cdk synth fails with an IAM error.
-        # - sts:AssumeRole on the CDK lookup role: CDK uses this bootstrap role to run
-        #   context lookups. If it can't assume it, it falls back to direct credentials
-        #   which also need ec2:DescribeAvailabilityZones explicitly.
-        synth_policies = [
+        # Permissions added to ALL CodeBuild projects in the pipeline (including Synth).
+        # code_build_defaults.role_policy is the reliable way to grant permissions in
+        # CDK Pipelines — synth_code_build_defaults.role_policy does not always take effect.
+        #
+        # - ssm:GetParameter: value_from_lookup calls SSM at synth time
+        # - ec2:DescribeAvailabilityZones: NetworkingStack resolves AZs at synth time
+        # - sts:AssumeRole on CDK lookup role: CDK uses this bootstrap role for context lookups;
+        #   if it can't assume it, it falls back to direct credentials for ec2 lookups
+        shared_policies = [
             iam.PolicyStatement(
                 actions=["ssm:GetParameter", "ssm:GetParameters"],
                 resources=[
@@ -104,7 +103,6 @@ class PipelineStack(cdk.Stack):
             pipeline_name=f"{app_name}-pipeline",
             synth=synth,
             synth_code_build_defaults=pipelines.CodeBuildOptions(
-                role_policy=synth_policies,
                 partial_build_spec=codebuild.BuildSpec.from_object({
                     "version": "0.2",
                     "phases": {
@@ -115,6 +113,7 @@ class PipelineStack(cdk.Stack):
                 })
             ),
             code_build_defaults=pipelines.CodeBuildOptions(
+                role_policy=shared_policies,
                 build_environment=codebuild.BuildEnvironment(
                     build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
                     privileged=True,

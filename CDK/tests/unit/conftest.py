@@ -60,5 +60,6 @@ def prod_stacks():
 
     return {
         "networking": networking,
+        "storage": storage,
         "compute": compute,
     }

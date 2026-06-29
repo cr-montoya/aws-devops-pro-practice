@@ -1,6 +1,6 @@
 # Cost Guide
 
-This repository is designed for low-cost study, but both apps create billable resources.
+This repository is designed for low-cost practice, but both apps create billable resources.
 
 ## SAM Task API
 
@@ -19,7 +19,7 @@ This repository is designed for low-cost study, but both apps create billable re
 | Service | Cost driver | Notes |
 |---|---|---|
 | ALB | Hourly and LCU | One of the larger steady costs |
-| ECS Fargate | vCPU/memory runtime | Stop/destroy when not studying |
+| ECS Fargate | vCPU/memory runtime | Stop/destroy when not actively validating |
 | Kinesis Data Streams | Shard hours and PUT payload units | Keep shard count low |
 | Firehose | Ingested data | Low for test payloads |
 | S3 | Raw archive storage | Add lifecycle policy for long-lived labs |

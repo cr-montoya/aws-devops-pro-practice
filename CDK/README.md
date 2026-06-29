@@ -161,7 +161,7 @@ After deployment, validate:
 
 ## Production Extensions
 
-The project is intentionally scoped for study. The natural production hardening path would add HTTPS/ACM, Route 53, AWS WAF, stronger smoke tests before promotion, container image scanning, secret rotation, backup plans, and service-level metrics.
+The project is intentionally scoped for practice. The natural production hardening path would add HTTPS/ACM, Route 53, AWS WAF, stronger smoke tests before promotion, container image scanning, secret rotation, backup plans, and service-level metrics.
 
 ## Cleanup
 

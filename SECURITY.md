@@ -1,6 +1,6 @@
 # Security
 
-This repository is a learning and portfolio environment. It is not a drop-in production baseline.
+This repository is a learning environment. It is not a drop-in production baseline.
 
 ## Reporting
 
@@ -17,4 +17,4 @@ If you find a security issue, open a private report if the hosting platform supp
 
 ## Supported Versions
 
-This repo tracks the current study implementation only. Security fixes are applied to the active branch as the project evolves.
+This repo tracks the current implementation only. Security fixes are applied to the active branch as the project evolves.

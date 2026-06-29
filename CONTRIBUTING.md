@@ -1,6 +1,6 @@
 # Contributing
 
-This is a study and portfolio repository, so contributions should keep the projects easy to understand and safe to run in a personal AWS account.
+This is a learning repository, so contributions should keep the projects easy to understand and safe to run in a personal AWS account.
 
 ## Guidelines
 

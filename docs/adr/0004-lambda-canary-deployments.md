@@ -16,5 +16,5 @@ Use `AutoPublishAlias: live` with `DeploymentPreference: Canary10Percent5Minutes
 
 - New versions receive a small traffic percentage before full promotion.
 - CloudWatch alarms can trigger rollback.
-- The pattern is easy to identify for DOP-C02 study.
+- The pattern is easy to identify for DOP-C02 practice.
 - Canary deployment on trivial functions may be more operational overhead than a production team would choose, but it is useful for this lab.

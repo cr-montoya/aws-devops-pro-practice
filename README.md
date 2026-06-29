@@ -1,12 +1,18 @@
 # AWS DevOps Professional Practice
 
-Portfolio and study repository for the AWS Certified DevOps Engineer - Professional (DOP-C02) exam.
+![AWS](https://img.shields.io/badge/AWS-DevOps-orange)
+![Python](https://img.shields.io/badge/Python-3.12-blue)
+![AWS SAM](https://img.shields.io/badge/AWS-SAM-green)
+![AWS CDK](https://img.shields.io/badge/AWS-CDK-purple)
+![License](https://img.shields.io/badge/License-MIT-lightgrey)
+
+Hands-on AWS DevOps practice repository for the AWS Certified DevOps Engineer - Professional (DOP-C02) exam.
 
 This repo contains two production-inspired AWS applications. Each app uses a small business domain so the infrastructure, deployment workflow, observability, and operational trade-offs are easy to inspect. The domains are examples, not the point: the same patterns can be adapted to many real workloads that need automated delivery, reliable rollback paths, environment-aware infrastructure, monitoring, and clear cleanup behavior.
 
 ## Projects
 
-| Project | App domain | Main pattern | Best for studying |
+| Project | App domain | Main pattern | Focus area |
 |---|---|---|---|
 | [SAM Task API](SAM/README.md) | Task/status tracking API | Serverless REST API with safe Lambda deployments | SAM, API Gateway, Lambda aliases, CodeDeploy canaries, DynamoDB, CodePipeline |
 | [CDK Orders Platform](CDK/README.md) | Event-driven order ingestion | Container API plus async stream processing | CDK, ECS Fargate, private networking, Kinesis, Lambda processors, incident response, CDK Pipelines |
@@ -19,7 +25,7 @@ This repo contains two production-inspired AWS applications. Each app uses a sma
 - Model environment-specific behavior such as prod-only recovery and private workloads.
 - Keep the app domains simple enough that the DevOps decisions remain visible.
 - Preserve realistic operational concerns: IAM scope, observability, rollback, cost, and cleanup.
-- Document architecture decisions and operational runbooks like a real portfolio project.
+- Document architecture decisions and operational runbooks alongside the implementation.
 
 ## Architecture Overview
 
@@ -71,6 +77,15 @@ Use `CDK/` when you want to focus on broader platform engineering: multi-stack I
 
 Use both when you want to compare how the same DevOps ideas show up across different AWS deployment models.
 
+## How To Review This Repo
+
+1. Start with this README for the big picture and project comparison.
+2. Open [SAM/README.md](SAM/README.md) if you want to inspect serverless delivery, Lambda canaries, API Gateway, DynamoDB, and SAM packaging.
+3. Open [CDK/README.md](CDK/README.md) if you want to inspect platform engineering, ECS/Fargate, Kinesis, private networking, DLQs, and CDK Pipelines.
+4. Review [docs/architecture](docs/architecture/) for diagrams.
+5. Review [docs/adr](docs/adr/) to see why the main design choices were made.
+6. Review [docs/runbooks](docs/runbooks/) to see how deployment failures and cleanup are handled.
+
 ## Repository Structure
 
 ```text
@@ -94,12 +109,12 @@ Use both when you want to compare how the same DevOps ideas show up across diffe
 |   |-- src/                          # Lambda handlers
 |   `-- tests/                        # SAM unit tests
 `-- CDK/
-|   |-- README.md                     # CDK Orders Platform guide
-|   |-- app.py                        # CDK app entry point
-|   |-- stacks/                       # CDK stacks
-|   |-- ecs/                          # FastAPI container app
-|   |-- lambda/                       # Stream processor and redriver
-|   `-- tests/                        # CDK unit tests
+    |-- README.md                     # CDK Orders Platform guide
+    |-- app.py                        # CDK app entry point
+    |-- stacks/                       # CDK stacks
+    |-- ecs/                          # FastAPI container app
+    |-- lambda/                       # Stream processor and redriver
+    `-- tests/                        # CDK unit tests
 ```
 
 ## Prerequisites
@@ -162,7 +177,7 @@ make validate-all
 
 ## Documentation
 
-Portfolio documentation lives in [docs/](docs/):
+Additional documentation lives in [docs/](docs/):
 
 - [Architecture diagrams](docs/architecture/)
 - [Architecture decision records](docs/adr/)
@@ -172,7 +187,7 @@ Portfolio documentation lives in [docs/](docs/):
 
 ## Cost Notes
 
-These are lab and portfolio projects, but they create billable AWS resources.
+These are lab projects, but they create billable AWS resources.
 
 Cost-aware design choices include:
 
@@ -187,11 +202,11 @@ Resources to watch:
 - API Gateway, Lambda, DynamoDB, CloudWatch, CodePipeline, CodeBuild, and S3 artifacts in `SAM/`
 - ALB, Fargate, Kinesis, Firehose, VPC endpoints, Lambda, DynamoDB, S3, CloudWatch, CodePipeline, and CodeBuild in `CDK/`
 
-Deploy only what you are actively studying and clean up after validation.
+Deploy only what you are actively validating and clean up afterward.
 
 ## Safety Notes
 
-These projects are built for learning and portfolio demonstration. Before using either design in production, review account boundaries, IAM scope, encryption requirements, backup policy, secret rotation, WAF/TLS posture, deployment alarms, and organizational tagging standards.
+These projects are built for learning and experimentation. Before using either design in production, review account boundaries, IAM scope, encryption requirements, backup policy, secret rotation, WAF/TLS posture, deployment alarms, and organizational tagging standards.
 
 The CDK project includes a guarded teardown workflow. The SAM project retains DynamoDB tables by default. Read the cleanup sections before deleting stacks.
 

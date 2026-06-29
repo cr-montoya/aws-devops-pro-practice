@@ -1,6 +1,6 @@
 # Documentation
 
-This folder contains portfolio-oriented documentation that complements the application READMEs.
+This folder contains supporting documentation that complements the application READMEs.
 
 ## Contents
 

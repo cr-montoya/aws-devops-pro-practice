@@ -28,7 +28,7 @@ flowchart LR
     Prod --> Teardown[Optional guarded teardown wave]
 ```
 
-## Portfolio Signal
+## Common Delivery Pattern
 
 Both pipelines demonstrate the same operational idea with different tooling:
 

@@ -1,201 +1,207 @@
-# Task API - Serverless Application
+# SAM Task API
 
-A simple serverless task management API built with AWS SAM, demonstrating best practices for DOP-C02 exam preparation.
+Serverless task-management API built with AWS SAM. The root [README](../README.md) explains the repo goals, DOP-C02 coverage, shared cost notes, and how this project compares with the CDK app.
 
-**Author:** Cristian Montoya
+This app focuses on a compact serverless release pattern: API Gateway, Lambda, DynamoDB, CloudWatch alarms, Lambda canary deployments, and a dev-to-prod CodePipeline.
 
-## Table of Contents
+## Architecture
 
-- [Project Structure](#project-structure)
-- [API Endpoints](#api-endpoints)
-- [Prerequisites](#prerequisites)
-- [Setup](#setup)
-- [Deployment](#deployment)
-  - [Pipeline Architecture](#pipeline-architecture)
-  - [Local Development](#local-development)
-  - [Deploy Pipeline Stack](#deploy-pipeline-stack-one-time-setup)
-  - [After Activation](#after-activation)
-- [Testing Endpoints](#testing-endpoints)
-  - [Get API Key](#get-api-key)
-  - [Using Postman](#using-postman)
-  - [Using cURL](#using-curl)
-- [Key Features](#key-features)
+```text
+Client
+  |
+  v
+API Gateway REST API
+  |-- API key required
+  |-- Usage plan quota and throttling
+  |-- CORS, access logs, X-Ray tracing
+  |
+  +--> GET  /health           --> HealthCheckFunction
+  +--> POST /create_task      --> CreateTaskFunction
+  +--> GET  /tasks            --> ListTasksFunction
+  +--> GET  /tasks/{task_id}  --> GetTaskFunction
+  +--> PUT  /tasks/{task_id}  --> UpdateTaskFunction
+                                |
+                                v
+                             DynamoDB
 
-## Project Structure
-
-```
-SAM/
-├── src/                          # Lambda function code
-│   ├── health_check/             # Health check endpoint
-│   ├── create_task/              # Create a new task
-│   ├── get_task/                 # Get a single task by ID
-│   ├── list_task/                # List all tasks
-│   └── update_task/              # Update task status
-├── tests/                        # Test suite
-│   ├── unit/                     # Unit tests for all functions
-│   └── requirements.txt          # Test dependencies
-├── events/                       # Sample Lambda events for local testing
-├── template.yaml                 # SAM template (infrastructure as code)
-├── samconfig.toml                # SAM deployment configuration (dev/prod profiles)
-├── buildspec.yml                 # CodeBuild build specification (CI/CD)
-├── pipeline.yaml                 # CodePipeline infrastructure template
-├── requirements.txt              # Application dependencies
-├── swagger.json                  # API documentation
-└── README.md                     # This file
+CloudWatch alarms monitor Lambda errors, API Gateway 5XXs, and API latency.
+SAM configures Lambda aliases and CodeDeploy canaries with Canary10Percent5Minutes.
 ```
 
-## API Endpoints
+## What Is Included
 
-| Method | Path | Description |
-|--------|------|-------------|
+- `template.yaml`: SAM application template.
+- `pipeline.yaml`: CodePipeline, CodeBuild, deploy role, and manual approval.
+- `buildspec.yml`: installs test deps, runs `sam validate --lint`, unit tests, build, and package.
+- `samconfig.toml`: direct deploy profiles for `dev` and `prod`.
+- `src/`: Lambda handlers plus shared HTTP helpers.
+- `tests/unit/`: moto-backed unit tests.
+- `swagger.json`: portable API contract.
+- `events/`: local invocation payloads.
+
+## API
+
+All endpoints require `x-api-key`.
+
+| Method | Path | Purpose |
+|---|---|---|
 | `GET` | `/health` | Health check |
-| `POST` | `/create_task` | Create a new task |
-| `GET` | `/tasks` | List all tasks |
-| `GET` | `/tasks/{task_id}` | Get a single task |
+| `POST` | `/create_task` | Create a task |
+| `GET` | `/tasks?limit=25&next_token=<token>` | List tasks with pagination |
+| `GET` | `/tasks/{task_id}` | Get one task |
 | `PUT` | `/tasks/{task_id}` | Update task status |
 
-**All endpoints require `x-api-key` header.**
+Create:
 
-## Prerequisites
+```bash
+curl -X POST "$API_URL/create_task" \
+  -H "x-api-key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Example Task"}'
+```
 
-- AWS credentials configured (`aws configure`)
-- Python 3.12+
-- AWS SAM CLI
+Update:
 
-## Setup
+```bash
+curl -X PUT "$API_URL/tasks/<task-id>" \
+  -H "x-api-key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "DONE"}'
+```
+
+Allowed statuses: `PENDING`, `IN_PROGRESS`, `DONE`.
+
+## Environment Behavior
+
+| Capability | dev/qa | prod |
+|---|---|---|
+| DynamoDB PITR | Disabled | Enabled |
+| DynamoDB deletion protection | Disabled | Enabled |
+| API access log retention | 14 days | 90 days |
+| Lambda tracing | Active | Active |
+| Lambda deployment | Canary10Percent5Minutes | Canary10Percent5Minutes |
+| Pipeline promotion | Automatic dev deploy | Manual approval before prod |
+
+`AllowedCorsOrigin` defaults to `*` for lab convenience. Override it for production-style deployments.
+
+## Local Workflow
 
 ```bash
 cd SAM
-python3 -m venv venv
-source venv/bin/activate
-pip install -r tests/unit/requirements.txt
-```
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r tests/requirements.txt
 
-## Deployment
-
-This application uses an automated CI/CD pipeline via AWS CodePipeline.
-
-### Pipeline Architecture
-
-```
-GitHub (serverless branch)
-  ↓
-CodePipeline triggers automatically
-  ↓
-CodeBuild: install → run tests → sam build → sam package
-  ↓
-Deploy to Dev (automatic, Stage=dev)
-  ↓
-Manual Approval Gate (email notification)
-  ↓
-Deploy to Prod (Stage=prod, with canary deployment)
-  ├→ 10% traffic to new version for 5 minutes
-  ├→ CloudWatch Alarms monitor errors
-  └→ Auto-rollback if errors detected
-```
-
-### Local Development
-
-```bash
-# Run all unit tests
+python -m pytest tests/unit -q
 python3 -m unittest discover tests/unit/ -v
-
-# Build the application
+sam validate --lint
 sam build
-
-# Deploy locally (without pipeline)
-sam deploy --profile dev
-
-# Test locally with API Gateway emulation
-sam local start-api  # http://localhost:3000
-
-# Delete a stack
-sam delete
 ```
 
-### Test Locally with Sample Events
-
-Use the sample events in `events/` to test each endpoint:
+Local invokes:
 
 ```bash
-# Start local API server (in one terminal)
-sam local start-api
-
-# In another terminal, test endpoints with the sample events
 sam local invoke HealthCheckFunction -e events/health_check.json
 sam local invoke CreateTaskFunction -e events/create_task.json
-sam local invoke GetTaskFunction -e events/get_task.json
 sam local invoke ListTasksFunction -e events/list_tasks.json
-sam local invoke UpdateTaskFunction -e events/update_task.json
-
-# Or use curl against the local API
-curl http://localhost:3000/health \
-  -H "x-api-key: test-key"
 ```
 
-### Deploy Pipeline Stack (One-time Setup)
+Local API:
+
+```bash
+sam local start-api
+curl "http://localhost:3000/health" -H "x-api-key: test-key"
+```
+
+## Direct Deploy
+
+```bash
+sam deploy --config-env dev
+sam deploy --config-env prod
+```
+
+With restricted CORS:
+
+```bash
+sam deploy --config-env prod \
+  --parameter-overrides Stage=prod AllowedCorsOrigin=https://example.com
+```
+
+## Pipeline
+
+```text
+Source -> Build -> DeployDev -> Manual Approval -> DeployProd
+```
+
+Build runs `sam validate --lint`, unit tests, `sam build`, and `sam package`. Lambda deployment safety is handled in the SAM template through aliases, CodeDeploy canary traffic shifting, and CloudWatch alarms.
+
+Deploy the pipeline stack:
 
 ```bash
 aws cloudformation deploy \
-  --template-file SAM/pipeline.yaml \
+  --template-file pipeline.yaml \
   --stack-name task-api-pipeline \
   --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
   --parameter-overrides \
     GitHubOwner=<your-github-username> \
     GitHubRepo=<repository-name> \
-    GitHubBranch=serverless \
+    GitHubBranch=main \
     ApprovalEmail=<your-email> \
   --region us-east-2
 ```
 
-Then manually activate the GitHub connection in AWS Console:
-1. Go to Developer Tools → Connections
-2. Find `task-api-github-connection`
-3. Click "Update pending connection" and authorize OAuth
+After deployment, activate `task-api-github-connection` in AWS Developer Tools / Connections.
 
-### After Activation
+## Deployed Validation
 
-Just push to the `serverless` branch—the pipeline triggers automatically:
-- Tests run in CodeBuild
-- Dev deploys automatically
-- Prod requires manual approval
-- Prod uses canary deployment (safer rollouts)
-
-## Testing Endpoints
-
-### Get API Key
 ```bash
+API_URL=$(aws cloudformation describe-stacks \
+  --stack-name task-application-dev \
+  --query "Stacks[0].Outputs[?OutputKey=='TaskApiUrl'].OutputValue" \
+  --output text \
+  --region us-east-2)
+
 aws apigateway get-api-keys --include-values --region us-east-2
+
+curl "$API_URL/health" -H "x-api-key: $API_KEY"
+curl "$API_URL/tasks?limit=1" -H "x-api-key: $API_KEY"
 ```
 
-### Using Postman
-1. Import `swagger.json` into Postman
-2. Set `x-api-key` header with your API key
-3. Test endpoints
+Check CloudWatch alarms, API access logs, DynamoDB items, and Lambda aliases after deployment.
 
-### Using cURL
+## Troubleshooting
+
+If `sam deploy --config-env dev` fails with `AWS::EarlyValidation::ResourceExistenceCheck`, check whether a retained table already exists:
+
 ```bash
-curl -X POST https://<api-id>.execute-api.us-east-2.amazonaws.com/dev/create_task \
-  -H "x-api-key: <your-api-key>" \
-  -H "Content-Type: application/json" \
-  -d '{"task_name": "Example Task"}'
+aws dynamodb describe-table \
+  --table-name tasks-dev \
+  --region us-east-2
 ```
 
-## Key Features
+For disposable dev data, delete the retained table and retry the deploy:
 
-### Application
--  API Key authentication
--  CORS enabled
--  DynamoDB integration
--  Unit tests with moto
--  Separate Lambda per operation
--  Least privilege IAM
+```bash
+aws dynamodb delete-table \
+  --table-name tasks-dev \
+  --region us-east-2
 
-### CI/CD Pipeline
--  Automated deployments on push
--  Automatic unit testing via CodeBuild
--  Multi-environment (dev → prod)
--  Canary deployments in production (10% → 100%)
--  Automatic rollback on errors
--  CloudWatch Alarms monitoring per Lambda
--  Manual approval gate before prod
+aws dynamodb wait table-not-exists \
+  --table-name tasks-dev \
+  --region us-east-2
+```
+
+For data you need to keep, import the table into CloudFormation or deploy with another `Stage` value. The template retains DynamoDB tables only in prod; dev and qa tables are deleted with the stack.
+
+## Cleanup
+
+```bash
+sam delete --config-env dev
+sam delete --config-env prod
+
+aws cloudformation delete-stack \
+  --stack-name task-api-pipeline \
+  --region us-east-2
+```
+
+Prod DynamoDB tables are retained by design. Review retained `tasks-prod` tables after deleting prod stacks.

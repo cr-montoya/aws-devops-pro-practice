@@ -18,6 +18,8 @@ phases:
   # If tests fail here, pipeline stops and skips sam build
   pre_build:
     commands:
+      - echo "Validating SAM template..."
+      - sam validate --lint
       - echo "Running unit tests..."
       # Runs ALL tests in tests/unit/
       # If any fail → CodeBuild returns exit code != 0 → pipeline STOPS

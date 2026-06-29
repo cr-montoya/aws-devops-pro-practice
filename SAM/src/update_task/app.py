@@ -1,9 +1,20 @@
-import boto3
-import json
+import logging
 import os
 
-dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table(os.environ.get('TABLE_NAME', 'Tasks-${Stage}'))
+import boto3
+
+try:
+    from common.http import json_response, parse_json_body
+except ModuleNotFoundError:
+    from src.common.http import json_response, parse_json_body
+
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+def get_table():
+    dynamodb = boto3.resource('dynamodb')
+    return dynamodb.Table(os.environ.get('TABLE_NAME', 'Tasks-${Stage}'))
 
 VALID_STATUSES = ['PENDING', 'DONE']
 
@@ -22,27 +33,22 @@ def lambda_handler(event, context):
         404: No task found with the given task_id.
     """
     task_id = (event.get('pathParameters') or {}).get('task_id')
-    body = json.loads(event['body'])
+    body, error_response = parse_json_body(event)
+    if error_response:
+        return error_response
+
     status = body.get('status')
 
     if not task_id or not status:
-        return {
-            'statusCode': 400,
-            'body': json.dumps({'error': 'task_id and status are required'})
-        }
+        return json_response(400, {'error': 'task_id and status are required'})
 
     if status not in VALID_STATUSES:
-        return {
-            'statusCode': 400,
-            'body': json.dumps({'error': f'status must be one of {VALID_STATUSES}'})
-        }
+        return json_response(400, {'error': f'status must be one of {VALID_STATUSES}'})
 
+    table = get_table()
     existing = table.get_item(Key={'task_id': task_id})
     if not existing.get('Item'):
-        return {
-            'statusCode': 404,
-            'body': json.dumps({'error': 'Task not found'})
-        }
+        return json_response(404, {'error': 'Task not found'})
 
     response = table.update_item(
         Key={'task_id': task_id},
@@ -52,7 +58,5 @@ def lambda_handler(event, context):
         ReturnValues='ALL_NEW'
     )
 
-    return {
-        'statusCode': 200,
-        'body': json.dumps(response['Attributes'])
-    }
+    logger.info('Task status updated', extra={'task_id': task_id, 'status': status})
+    return json_response(200, response['Attributes'])

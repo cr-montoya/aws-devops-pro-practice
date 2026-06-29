@@ -12,16 +12,73 @@ Parameters:
       - prod
     Description: The stage of the application (e.g., qa, prod)
 
+  AllowedCorsOrigin:
+    Type: String
+    Default: "*"
+    Description: Origin allowed by API Gateway CORS. Use a specific domain for production workloads.
+
+Conditions:
+  IsProd: !Equals [!Ref Stage, prod]
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 10
+    MemorySize: 256
+    Tracing: Active
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref TaskDynamoDBTable
+    Tags:
+      createdBy: SAM
+      stage: !Ref Stage
+
 Resources:
+  ApiGatewayCloudWatchRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+
+  ApiGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !GetAtt ApiGatewayCloudWatchRole.Arn
+
+  TaskApiAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/apigateway/task-api-${Stage}"
+      RetentionInDays: !If [IsProd, 90, 14]
+
   TaskApi:
     Type: AWS::Serverless::Api
+    DependsOn: ApiGatewayAccount
     Properties:
       Name: !Sub "task-api-${Stage}"
       StageName: !Ref Stage
+      TracingEnabled: true
+      AccessLogSetting:
+        DestinationArn: !GetAtt TaskApiAccessLogGroup.Arn
+        Format: >-
+          {"requestId":"$context.requestId","ip":"$context.identity.sourceIp","caller":"$context.identity.caller","user":"$context.identity.user","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","resourcePath":"$context.resourcePath","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength","integrationError":"$context.integrationErrorMessage"}
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          MetricsEnabled: true
+          LoggingLevel: INFO
+          DataTraceEnabled: false
       Cors:
         AllowMethods: "'GET,POST,PUT,OPTIONS'"
         AllowHeaders: "'Content-Type,X-Api-Key'"
-        AllowOrigin: "'*'"
+        AllowOrigin: !Sub "'${AllowedCorsOrigin}'"
       Auth:
         ApiKeyRequired: true
         UsagePlan:
@@ -38,9 +95,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Description: Health check endpoint for the application
-      CodeUri: src/health_check/
-      Handler: app.lambda_handler
-      Runtime: python3.12
+      CodeUri: src/
+      Handler: health_check.app.lambda_handler
       AutoPublishAlias: live
       DeploymentPreference:
         Type: Canary10Percent5Minutes
@@ -53,24 +109,24 @@ Resources:
               RestApiId: !Ref TaskApi
               Path: /health
               Method: get
-      Tags:
-        createdBy: SAM
 
   CreateTaskFunction:
     Type: AWS::Serverless::Function
     Properties:
       Description: Create task endpoint for the application
-      CodeUri: src/create_task/
-      Handler: app.lambda_handler
-      Runtime: python3.12
+      CodeUri: src/
+      Handler: create_task.app.lambda_handler
       AutoPublishAlias: live
       DeploymentPreference:
         Type: Canary10Percent5Minutes
         Alarms:
           - !Ref CreateTaskFunctionErrorAlarm
       Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref TaskDynamoDBTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+              Resource: !GetAtt TaskDynamoDBTable.Arn
       Events:
         CreateTask:
           Type: Api
@@ -78,20 +134,13 @@ Resources:
               RestApiId: !Ref TaskApi
               Path: /create_task
               Method: post
-      Environment:
-        Variables:
-          TABLE_NAME: !Ref TaskDynamoDBTable
-      Tags:
-        createdBy: SAM
-        stage: !Ref Stage
 
   GetTaskFunction:
     Type: AWS::Serverless::Function
     Properties:
       Description: Get a single task by task_id
-      CodeUri: src/get_task/
-      Handler: app.lambda_handler
-      Runtime: python3.12
+      CodeUri: src/
+      Handler: get_task.app.lambda_handler
       AutoPublishAlias: live
       DeploymentPreference:
         Type: Canary10Percent5Minutes
@@ -107,20 +156,13 @@ Resources:
               RestApiId: !Ref TaskApi
               Path: /tasks/{task_id}
               Method: get
-      Environment:
-        Variables:
-          TABLE_NAME: !Ref TaskDynamoDBTable
-      Tags:
-        createdBy: SAM
-        stage: !Ref Stage
 
   ListTasksFunction:
     Type: AWS::Serverless::Function
     Properties:
       Description: List all tasks
-      CodeUri: src/list_task/
-      Handler: app.lambda_handler
-      Runtime: python3.12
+      CodeUri: src/
+      Handler: list_task.app.lambda_handler
       AutoPublishAlias: live
       DeploymentPreference:
         Type: Canary10Percent5Minutes
@@ -136,28 +178,25 @@ Resources:
               RestApiId: !Ref TaskApi
               Path: /tasks
               Method: get
-      Environment:
-        Variables:
-          TABLE_NAME: !Ref TaskDynamoDBTable
-      Tags:
-        createdBy: SAM
-        stage: !Ref Stage
 
   UpdateTaskFunction:
     Type: AWS::Serverless::Function
     Properties:
       Description: Update the status of an existing task
-      CodeUri: src/update_task/
-      Handler: app.lambda_handler
-      Runtime: python3.12
+      CodeUri: src/
+      Handler: update_task.app.lambda_handler
       AutoPublishAlias: live
       DeploymentPreference:
         Type: Canary10Percent5Minutes
         Alarms:
           - !Ref UpdateTaskFunctionErrorAlarm
       Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref TaskDynamoDBTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt TaskDynamoDBTable.Arn
       Events:
         UpdateTask:
           Type: Api
@@ -165,15 +204,11 @@ Resources:
               RestApiId: !Ref TaskApi
               Path: /tasks/{task_id}
               Method: put
-      Environment:
-        Variables:
-          TABLE_NAME: !Ref TaskDynamoDBTable
-      Tags:
-        createdBy: SAM
-        stage: !Ref Stage
 
   TaskDynamoDBTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: !If [IsProd, Retain, Delete]
+    UpdateReplacePolicy: !If [IsProd, Retain, Delete]
     Properties:
       TableName: !Sub "tasks-${Stage}"
       AttributeDefinitions:
@@ -183,6 +218,14 @@ Resources:
         - AttributeName: task_id
           KeyType: HASH
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: !If [IsProd, true, false]
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: !If [IsProd, true, false]
+      SSESpecification:
+        SSEEnabled: true
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: false
       Tags:
         - Key: createdBy
           Value: SAM
@@ -277,6 +320,42 @@ Resources:
       EvaluationPeriods: 1
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  TaskApi5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "TaskApi-5XX-${Stage}"
+      Namespace: AWS/ApiGateway
+      MetricName: 5XXError
+      Dimensions:
+        - Name: ApiName
+          Value: !Sub "task-api-${Stage}"
+        - Name: Stage
+          Value: !Ref Stage
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  TaskApiHighLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "TaskApi-HighLatency-${Stage}"
+      Namespace: AWS/ApiGateway
+      MetricName: Latency
+      Dimensions:
+        - Name: ApiName
+          Value: !Sub "task-api-${Stage}"
+        - Name: Stage
+          Value: !Ref Stage
+      Statistic: Average
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 1000
+      ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
 
 Outputs:

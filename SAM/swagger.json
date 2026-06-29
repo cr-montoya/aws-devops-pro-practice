@@ -1,168 +1,288 @@
 {
-  "swagger" : "2.0",
-  "info" : {
-    "version" : "1.0",
-    "title" : "task-api-prod"
+  "swagger": "2.0",
+  "info": {
+    "version": "1.0",
+    "title": "Task API"
   },
-  "host" : "8jegcfddkf.execute-api.us-east-2.amazonaws.com",
-  "basePath" : "/prod",
-  "schemes" : [ "https" ],
-  "paths" : {
-    "/create_task" : {
-      "post" : {
-        "responses" : { },
-        "security" : [ {
-          "api_key" : [ ]
-        } ]
-      },
-      "options" : {
-        "consumes" : [ "application/json" ],
-        "produces" : [ "application/json" ],
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "headers" : {
-              "Access-Control-Allow-Origin" : {
-                "type" : "string"
-              },
-              "Access-Control-Allow-Methods" : {
-                "type" : "string"
-              },
-              "Access-Control-Allow-Headers" : {
-                "type" : "string"
-              }
+  "basePath": "/dev",
+  "schemes": [
+    "https"
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Application health response",
+            "schema": {
+              "$ref": "#/definitions/HealthResponse"
             }
           }
         },
-        "security" : [ {
-          "api_key" : [ ]
-        } ]
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
       }
     },
-    "/health" : {
-      "get" : {
-        "responses" : { },
-        "security" : [ {
-          "api_key" : [ ]
-        } ]
-      },
-      "options" : {
-        "consumes" : [ "application/json" ],
-        "produces" : [ "application/json" ],
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "headers" : {
-              "Access-Control-Allow-Origin" : {
-                "type" : "string"
-              },
-              "Access-Control-Allow-Methods" : {
-                "type" : "string"
-              },
-              "Access-Control-Allow-Headers" : {
-                "type" : "string"
-              }
+    "/create_task": {
+      "post": {
+        "summary": "Create a task",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CreateTaskRequest"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Task created",
+            "schema": {
+              "$ref": "#/definitions/Task"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Generated task_id already exists",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
             }
           }
         },
-        "security" : [ {
-          "api_key" : [ ]
-        } ]
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
       }
     },
-    "/tasks" : {
-      "get" : {
-        "responses" : { },
-        "security" : [ {
-          "api_key" : [ ]
-        } ]
-      },
-      "options" : {
-        "consumes" : [ "application/json" ],
-        "produces" : [ "application/json" ],
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "headers" : {
-              "Access-Control-Allow-Origin" : {
-                "type" : "string"
-              },
-              "Access-Control-Allow-Methods" : {
-                "type" : "string"
-              },
-              "Access-Control-Allow-Headers" : {
-                "type" : "string"
-              }
+    "/tasks": {
+      "get": {
+        "summary": "List tasks",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 25
+          },
+          {
+            "name": "next_token",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of tasks",
+            "schema": {
+              "$ref": "#/definitions/ListTasksResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid pagination request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
             }
           }
         },
-        "security" : [ {
-          "api_key" : [ ]
-        } ]
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
       }
     },
-    "/tasks/{task_id}" : {
-      "get" : {
-        "parameters" : [ {
-          "name" : "task_id",
-          "in" : "path",
-          "required" : true,
-          "type" : "string"
-        } ],
-        "responses" : { },
-        "security" : [ {
-          "api_key" : [ ]
-        } ]
-      },
-      "put" : {
-        "parameters" : [ {
-          "name" : "task_id",
-          "in" : "path",
-          "required" : true,
-          "type" : "string"
-        } ],
-        "responses" : { },
-        "security" : [ {
-          "api_key" : [ ]
-        } ]
-      },
-      "options" : {
-        "consumes" : [ "application/json" ],
-        "produces" : [ "application/json" ],
-        "parameters" : [ {
-          "name" : "task_id",
-          "in" : "path",
-          "required" : true,
-          "type" : "string"
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "headers" : {
-              "Access-Control-Allow-Origin" : {
-                "type" : "string"
-              },
-              "Access-Control-Allow-Methods" : {
-                "type" : "string"
-              },
-              "Access-Control-Allow-Headers" : {
-                "type" : "string"
-              }
+    "/tasks/{task_id}": {
+      "get": {
+        "summary": "Get a task",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task found",
+            "schema": {
+              "$ref": "#/definitions/Task"
+            }
+          },
+          "400": {
+            "description": "Missing task_id",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
             }
           }
         },
-        "security" : [ {
-          "api_key" : [ ]
-        } ]
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      },
+      "put": {
+        "summary": "Update task status",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/UpdateTaskRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task updated",
+            "schema": {
+              "$ref": "#/definitions/Task"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
       }
     }
   },
-  "securityDefinitions" : {
-    "api_key" : {
-      "type" : "apiKey",
-      "name" : "x-api-key",
-      "in" : "header"
+  "securityDefinitions": {
+    "api_key": {
+      "type": "apiKey",
+      "name": "x-api-key",
+      "in": "header"
     }
   },
-  "x-amazon-apigateway-security-policy" : "TLS_1_0"
+  "definitions": {
+    "CreateTaskRequest": {
+      "type": "object",
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "example": "Example Task"
+        }
+      }
+    },
+    "UpdateTaskRequest": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "PENDING",
+            "IN_PROGRESS",
+            "DONE"
+          ],
+          "example": "DONE"
+        }
+      }
+    },
+    "Task": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "ListTasksResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Task"
+          }
+        },
+        "next_token": {
+          "type": "string",
+          "x-nullable": true
+        }
+      }
+    },
+    "HealthResponse": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "example": "All systems operational"
+        }
+      }
+    },
+    "ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "string"
+        }
+      }
+    }
+  }
 }

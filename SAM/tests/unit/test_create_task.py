@@ -1,37 +1,25 @@
-import boto3
 import json
 import unittest
+from unittest.mock import patch
+
 from moto import mock_aws
+
 from src.create_task.app import lambda_handler
+from tests.unit.helpers import create_tasks_table
 
 
 class TestCreateTask(unittest.TestCase):
 
     @mock_aws
     def test_create_task_success(self):
-        # Step 1: Setup - Create mock DynamoDB table
-        dynamodb = boto3.resource('dynamodb', region_name='us-east-2')
-        dynamodb.create_table(
-            TableName='Tasks-${Stage}',
-            KeySchema=[
-                {'AttributeName': 'task_id', 'KeyType': 'HASH'}
-            ],
-            AttributeDefinitions=[
-                {'AttributeName': 'task_id', 'AttributeType': 'S'}
-            ],
-            BillingMode='PAY_PER_REQUEST'
-        )
+        create_tasks_table()
 
-        # Step 2: Prepare the Lambda event
-        event = {
+        response = lambda_handler({
             'body': json.dumps({'title': 'Learn SAM'})
-        }
+        }, None)
 
-        # Step 3: Call the Lambda handler
-        response = lambda_handler(event, None)
-
-        # Step 4: Assertions
         self.assertEqual(response['statusCode'], 201)
+        self.assertEqual(response['headers']['Content-Type'], 'application/json')
         body = json.loads(response['body'])
         self.assertEqual(body['title'], 'Learn SAM')
         self.assertEqual(body['status'], 'PENDING')
@@ -40,63 +28,52 @@ class TestCreateTask(unittest.TestCase):
 
     @mock_aws
     def test_create_task_no_title(self):
-        # Setup - Create mock DynamoDB table
-        dynamodb = boto3.resource('dynamodb', region_name='us-east-2')
-        dynamodb.create_table(
-            TableName='Tasks-${Stage}',
-            KeySchema=[
-                {'AttributeName': 'task_id', 'KeyType': 'HASH'}
-            ],
-            AttributeDefinitions=[
-                {'AttributeName': 'task_id', 'AttributeType': 'S'}
-            ],
-            BillingMode='PAY_PER_REQUEST'
-        )
+        create_tasks_table()
 
-        # Event without title
-        event = {
+        response = lambda_handler({
             'body': json.dumps({})
-        }
+        }, None)
 
-        # Call Lambda handler
-        response = lambda_handler(event, None)
-
-        # Assertions
         self.assertEqual(response['statusCode'], 400)
         body = json.loads(response['body'])
-        self.assertIn('error', body)
         self.assertEqual(body['error'], 'Title is required')
 
     @mock_aws
-    def test_create_task_duplicate_title(self):
-        # Setup - Create mock DynamoDB table
-        dynamodb = boto3.resource('dynamodb', region_name='us-east-2')
-        dynamodb.create_table(
-            TableName='Tasks-${Stage}',
-            KeySchema=[
-                {'AttributeName': 'task_id', 'KeyType': 'HASH'}
-            ],
-            AttributeDefinitions=[
-                {'AttributeName': 'task_id', 'AttributeType': 'S'}
-            ],
-            BillingMode='PAY_PER_REQUEST'
-        )
-
-        # Event 1: Create "Learn SAM"
+    def test_create_task_allows_duplicate_title(self):
+        create_tasks_table()
         event = {
             'body': json.dumps({'title': 'Learn SAM'})
         }
-        response1 = lambda_handler(event, None)
-        self.assertEqual(response1['statusCode'], 201)
 
-        # Event 2: Try to create "Learn SAM" again
+        response1 = lambda_handler(event, None)
         response2 = lambda_handler(event, None)
 
-        # Assertions
-        self.assertEqual(response2['statusCode'], 409)
-        body = json.loads(response2['body'])
-        self.assertIn('error', body)
-        self.assertEqual(body['error'], 'Title already exists')
+        self.assertEqual(response1['statusCode'], 201)
+        self.assertEqual(response2['statusCode'], 201)
+
+    @mock_aws
+    def test_create_task_generated_id_conflict(self):
+        table = create_tasks_table()
+        table.put_item(Item={'task_id': 'fixed-id', 'title': 'Existing', 'status': 'PENDING'})
+
+        with patch('src.create_task.app.uuid.uuid4', return_value='fixed-id'):
+            response = lambda_handler({
+                'body': json.dumps({'title': 'Learn SAM'})
+            }, None)
+
+        self.assertEqual(response['statusCode'], 409)
+        body = json.loads(response['body'])
+        self.assertEqual(body['error'], 'Task already exists')
+
+    @mock_aws
+    def test_create_task_invalid_json(self):
+        create_tasks_table()
+
+        response = lambda_handler({'body': '{invalid-json'}, None)
+
+        self.assertEqual(response['statusCode'], 400)
+        body = json.loads(response['body'])
+        self.assertEqual(body['error'], 'Request body must be valid JSON')
 
 
 if __name__ == '__main__':

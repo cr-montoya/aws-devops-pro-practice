@@ -15,5 +15,6 @@ class TestHealthCheck(unittest.TestCase):
 
         # Step 3: Assertions
         self.assertEqual(response['statusCode'], 200)
+        self.assertEqual(response['headers']['Content-Type'], 'application/json')
         body = json.loads(response['body'])
         self.assertEqual(body['message'], "All systems operational")

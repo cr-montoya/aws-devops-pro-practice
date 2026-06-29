@@ -1,9 +1,15 @@
 import boto3
-import json
 import os
 
-dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table(os.environ.get('TABLE_NAME', 'Tasks-${Stage}'))
+try:
+    from common.http import json_response
+except ModuleNotFoundError:
+    from src.common.http import json_response
+
+
+def get_table():
+    dynamodb = boto3.resource('dynamodb')
+    return dynamodb.Table(os.environ.get('TABLE_NAME', 'Tasks-${Stage}'))
 
 
 def lambda_handler(event, context):
@@ -22,21 +28,12 @@ def lambda_handler(event, context):
     task_id = path_params.get('task_id')
 
     if not task_id:
-        return {
-            'statusCode': 400,
-            'body': json.dumps({'error': 'task_id is required'})
-        }
+        return json_response(400, {'error': 'task_id is required'})
 
-    response = table.get_item(Key={'task_id': task_id})
+    response = get_table().get_item(Key={'task_id': task_id})
     item = response.get('Item')
 
     if not item:
-        return {
-            'statusCode': 404,
-            'body': json.dumps({'error': 'Task not found'})
-        }
+        return json_response(404, {'error': 'Task not found'})
 
-    return {
-        'statusCode': 200,
-        'body': json.dumps(item)
-    }
+    return json_response(200, item)

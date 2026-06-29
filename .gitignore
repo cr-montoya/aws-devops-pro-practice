@@ -18,7 +18,11 @@ dist/
 *.sam.json
 samconfig.toml.metadata
 
+# AWS CDK
+cdk.out/
+
 # Python
+.venv/
 venv/
 env/
 __pycache__/

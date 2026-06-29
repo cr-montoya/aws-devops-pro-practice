@@ -4,6 +4,13 @@ Event-driven orders platform built with AWS CDK. The root [README](../README.md)
 
 This app focuses on a broader platform pattern: ECS Fargate API, private production networking, Kinesis ingestion, Lambda processing, DLQ recovery, observability, incident response, and CDK Pipelines.
 
+Related docs:
+
+- [Architecture diagram](../docs/architecture/cdk-orders-platform.md)
+- [Pipeline diagram](../docs/architecture/pipelines.md)
+- [CDK pipeline runbook](../docs/runbooks/cdk-pipeline-failure.md)
+- [Private ECS without NAT ADR](../docs/adr/0003-private-ecs-without-nat.md)
+
 ## Architecture
 
 ```text

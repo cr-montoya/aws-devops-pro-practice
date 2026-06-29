@@ -4,6 +4,13 @@ Serverless task-management API built with AWS SAM. The root [README](../README.m
 
 This app focuses on a compact serverless release pattern: API Gateway, Lambda, DynamoDB, CloudWatch alarms, Lambda canary deployments, and a dev-to-prod CodePipeline.
 
+Related docs:
+
+- [Architecture diagram](../docs/architecture/sam-task-api.md)
+- [Pipeline diagram](../docs/architecture/pipelines.md)
+- [SAM deploy failure runbook](../docs/runbooks/sam-deploy-failure.md)
+- [Lambda canary deployment ADR](../docs/adr/0004-lambda-canary-deployments.md)
+
 ## Architecture
 
 ```text

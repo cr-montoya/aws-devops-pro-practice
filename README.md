@@ -19,6 +19,7 @@ This repo contains two production-inspired AWS applications. Each app uses a sma
 - Model environment-specific behavior such as prod-only recovery and private workloads.
 - Keep the app domains simple enough that the DevOps decisions remain visible.
 - Preserve realistic operational concerns: IAM scope, observability, rollback, cost, and cleanup.
+- Document architecture decisions, operational runbooks, and demo evidence like a real portfolio project.
 
 ## Architecture Overview
 
@@ -75,9 +76,17 @@ Use both when you want to compare how the same DevOps ideas show up across diffe
 ```text
 .
 |-- README.md                         # Repo entry point and shared guidance
+|-- Makefile                          # Common validation and build commands
 |-- LICENSE                           # Project license
 |-- CONTRIBUTING.md                   # Local contribution and validation notes
 |-- SECURITY.md                       # Security reporting and lab-safety notes
+|-- docs/
+|   |-- architecture/                 # Mermaid diagrams
+|   |-- adr/                          # Architecture decision records
+|   |-- runbooks/                     # Operational troubleshooting notes
+|   |-- demo/                         # Suggested demo evidence
+|   |-- costs.md
+|   `-- dop-c02-mapping.md
 |-- SAM/
 |   |-- README.md                     # SAM Task API guide
 |   |-- template.yaml                 # Serverless application template
@@ -138,6 +147,30 @@ cdk synth
 ```
 
 Each project README contains deployment-specific instructions.
+
+## Common Commands
+
+The root `Makefile` wraps the most common local checks:
+
+```bash
+make test-sam
+make validate-sam
+make build-sam
+make test-cdk
+make synth-cdk
+make validate-all
+```
+
+## Documentation
+
+Portfolio documentation lives in [docs/](docs/):
+
+- [Architecture diagrams](docs/architecture/)
+- [Architecture decision records](docs/adr/)
+- [Runbooks](docs/runbooks/)
+- [Cost guide](docs/costs.md)
+- [DOP-C02 mapping](docs/dop-c02-mapping.md)
+- [Demo evidence guide](docs/demo/)
 
 ## Cost Notes
 

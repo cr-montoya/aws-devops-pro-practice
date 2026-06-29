@@ -55,3 +55,36 @@ def test_endpoints_sg_allows_443(prod_stacks):
             assertions.Match.object_like({"FromPort": 443, "ToPort": 443})
         ])
     })
+
+
+def test_public_nacl_allows_alb_to_private_tasks(prod_stacks):
+    template = assertions.Template.from_stack(prod_stacks["networking"])
+    template.has_resource_properties("AWS::EC2::NetworkAclEntry", {
+        "CidrBlock": assertions.Match.any_value(),
+        "Egress": True,
+        "PortRange": {"From": 8080, "To": 8080},
+        "Protocol": 6,
+        "RuleAction": "allow",
+    })
+
+
+def test_private_nacl_allows_gateway_endpoint_https(prod_stacks):
+    template = assertions.Template.from_stack(prod_stacks["networking"])
+    template.has_resource_properties("AWS::EC2::NetworkAclEntry", {
+        "CidrBlock": "0.0.0.0/0",
+        "Egress": True,
+        "PortRange": {"From": 443, "To": 443},
+        "Protocol": 6,
+        "RuleAction": "allow",
+    })
+
+
+def test_private_nacl_allows_gateway_endpoint_return_traffic(prod_stacks):
+    template = assertions.Template.from_stack(prod_stacks["networking"])
+    template.has_resource_properties("AWS::EC2::NetworkAclEntry", {
+        "CidrBlock": "0.0.0.0/0",
+        "Egress": False,
+        "PortRange": {"From": 1024, "To": 65535},
+        "Protocol": 6,
+        "RuleAction": "allow",
+    })

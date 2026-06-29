@@ -27,7 +27,7 @@ class NetworkingStack(cdk.Stack):
 
         if self.is_production:
             # PRIVATE_ISOLATED: no internet route — VPC endpoints provide AWS service access
-            # Avoids NAT Gateway cost (~$32/month); VPC endpoints added when needed
+            # Avoids NAT Gateway cost (~$32/month)
             subnet_config.append(
                 ec2.SubnetConfiguration(
                     name="private",
@@ -36,8 +36,7 @@ class NetworkingStack(cdk.Stack):
                 )
             )
 
-        # enable_dns_hostnames + enable_dns_support are required for VPC endpoint private DNS
-        # to override public DNS resolution. CDK sets both by default but we make it explicit.
+        # Both DNS flags are required for VPC endpoint private DNS to override public resolution
         self.vpc = ec2.Vpc(self, "Vpc",
             vpc_name=f"{app_name}-{stage}-vpc",
             max_azs=2,
@@ -74,7 +73,7 @@ class NetworkingStack(cdk.Stack):
             direction=ec2.TrafficDirection.INGRESS,
             rule_action=ec2.Action.ALLOW
         )
-        # Inbound: ephemeral ports - return traffic from outbound connections (NACLs are stateless)
+        # Inbound: ephemeral ports — return traffic from outbound connections (NACLs are stateless)
         nacl.add_entry("InboundEphemeral",
             rule_number=120,
             cidr=ec2.AclCidr.any_ipv4(),
@@ -83,7 +82,7 @@ class NetworkingStack(cdk.Stack):
             rule_action=ec2.Action.ALLOW
         )
 
-        # Outbound: HTTPS to internet (ECR, Secrets Manager, Kinesis - dev only, prod uses VPC endpoints)
+        # Outbound: HTTPS to internet (dev tasks reach ECR/AWS directly; prod uses VPC endpoints)
         nacl.add_entry("OutboundHTTPS",
             rule_number=100,
             cidr=ec2.AclCidr.any_ipv4(),
@@ -91,7 +90,15 @@ class NetworkingStack(cdk.Stack):
             direction=ec2.TrafficDirection.EGRESS,
             rule_action=ec2.Action.ALLOW
         )
-        # Outbound: ephemeral ports - return traffic to internet clients
+        # Outbound: ALB health checks and requests to ECS tasks in private subnets
+        nacl.add_entry("OutboundContainer",
+            rule_number=105,
+            cidr=ec2.AclCidr.ipv4(self.vpc.vpc_cidr_block),
+            traffic=ec2.AclTraffic.tcp_port(8080),
+            direction=ec2.TrafficDirection.EGRESS,
+            rule_action=ec2.Action.ALLOW
+        )
+        # Outbound: ephemeral ports — return traffic to internet clients
         nacl.add_entry("OutboundEphemeral",
             rule_number=110,
             cidr=ec2.AclCidr.any_ipv4(),
@@ -100,17 +107,73 @@ class NetworkingStack(cdk.Stack):
             rule_action=ec2.Action.ALLOW
         )
 
+    def _add_private_nacl(self, app_name: str, stage: str):
+        # Private subnets only talk within the VPC (ALB -> tasks, tasks -> VPC endpoints)
+        vpc_cidr = ec2.AclCidr.ipv4(self.vpc.vpc_cidr_block)
+
+        nacl = ec2.NetworkAcl(self, "PrivateNacl",
+            vpc=self.vpc,
+            network_acl_name=f"{app_name}-{stage}-private-nacl",
+            subnet_selection=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED)
+        )
+
+        # Inbound: container port from ALB (within VPC only)
+        nacl.add_entry("InboundContainer",
+            rule_number=100,
+            cidr=vpc_cidr,
+            traffic=ec2.AclTraffic.tcp_port(8080),
+            direction=ec2.TrafficDirection.INGRESS,
+            rule_action=ec2.Action.ALLOW
+        )
+        # Inbound: HTTPS — tasks and endpoint ENIs share this NACL; cross-AZ connections
+        # require explicit 443 inbound on the receiving subnet (NACLs are stateless)
+        nacl.add_entry("InboundHTTPS",
+            rule_number=105,
+            cidr=vpc_cidr,
+            traffic=ec2.AclTraffic.tcp_port(443),
+            direction=ec2.TrafficDirection.INGRESS,
+            rule_action=ec2.Action.ALLOW
+        )
+        # Inbound: ephemeral ports — return traffic from interface endpoints and
+        # gateway endpoints (S3/DynamoDB use public service IPs routed via VPCE)
+        nacl.add_entry("InboundEphemeral",
+            rule_number=110,
+            cidr=ec2.AclCidr.any_ipv4(),
+            traffic=ec2.AclTraffic.tcp_port_range(1024, 65535),
+            direction=ec2.TrafficDirection.INGRESS,
+            rule_action=ec2.Action.ALLOW
+        )
+
+        # Outbound: HTTPS to interface and gateway endpoints.
+        # S3/DynamoDB gateway endpoints still use public service IP ranges, but the
+        # isolated subnet route table has no default route to the internet.
+        nacl.add_entry("OutboundHTTPS",
+            rule_number=100,
+            cidr=ec2.AclCidr.any_ipv4(),
+            traffic=ec2.AclTraffic.tcp_port(443),
+            direction=ec2.TrafficDirection.EGRESS,
+            rule_action=ec2.Action.ALLOW
+        )
+        # Outbound: ephemeral ports — return traffic to ALB
+        nacl.add_entry("OutboundEphemeral",
+            rule_number=110,
+            cidr=vpc_cidr,
+            traffic=ec2.AclTraffic.tcp_port_range(1024, 65535),
+            direction=ec2.TrafficDirection.EGRESS,
+            rule_action=ec2.Action.ALLOW
+        )
+
     def _add_vpc_endpoints(self, app_name: str, stage: str):
         private_subnets = ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED)
 
-        # Shared security group for all interface endpoints.
-        # Exposed as self.endpoints_sg so ComputeStack can add the task SG as an explicit
-        # ingress rule — more specific than VPC CIDR and avoids DNS resolution issues.
+        # Shared SG for all interface endpoints. allow_all_outbound=True is required —
+        # restricting egress causes ENI_SG_RULES_MISMATCH and breaks endpoint functionality.
+        # Exposed as self.endpoints_sg so ComputeStack can add the task SG as ingress.
         self.endpoints_sg = ec2.SecurityGroup(self, "EndpointsSG",
             vpc=self.vpc,
             security_group_name=f"{app_name}-{stage}-endpoints-sg",
             description="Allow HTTPS from within VPC to interface endpoints",
-            allow_all_outbound=False
+            allow_all_outbound=True
         )
         self.endpoints_sg.add_ingress_rule(
             peer=ec2.Peer.ipv4(self.vpc.vpc_cidr_block),
@@ -122,7 +185,7 @@ class NetworkingStack(cdk.Stack):
         # Required for Fargate in PRIVATE_ISOLATED subnets (no internet route):
         # - ECR API + Docker: image pull authentication and layer download
         # - ECS + ECS Agent + ECS Telemetry: task registration, heartbeat, container insights
-        # - STS: IAM task role credential refresh (missing this causes auth failures)
+        # - STS: IAM task role credential refresh
         # - Secrets Manager, CloudWatch Logs, Kinesis: application-level access
         for endpoint_id, service in [
             ("EcrApiEndpoint", ec2.InterfaceVpcEndpointAwsService.ECR),
@@ -149,58 +212,4 @@ class NetworkingStack(cdk.Stack):
         )
         self.vpc.add_gateway_endpoint("DynamoDbEndpoint",
             service=ec2.GatewayVpcEndpointAwsService.DYNAMODB
-        )
-
-    def _add_private_nacl(self, app_name: str, stage: str):
-        # Private subnets only talk within the VPC (ALB -> ECS tasks, VPC endpoints)
-        vpc_cidr = ec2.AclCidr.ipv4(self.vpc.vpc_cidr_block)
-
-        nacl = ec2.NetworkAcl(self, "PrivateNacl",
-            vpc=self.vpc,
-            network_acl_name=f"{app_name}-{stage}-private-nacl",
-            subnet_selection=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED)
-        )
-
-        # Inbound: container port from ALB (within VPC only)
-        nacl.add_entry("InboundContainer",
-            rule_number=100,
-            cidr=vpc_cidr,
-            traffic=ec2.AclTraffic.tcp_port(8080),
-            direction=ec2.TrafficDirection.INGRESS,
-            rule_action=ec2.Action.ALLOW
-        )
-        # Inbound: HTTPS from VPC CIDR — needed when task and endpoint ENI are in different
-        # AZs (different subnets). Traffic entering the endpoint's subnet on port 443 must be
-        # explicitly allowed. AWS routes to same-AZ endpoint when possible but not guaranteed.
-        nacl.add_entry("InboundHTTPS",
-            rule_number=105,
-            cidr=vpc_cidr,
-            traffic=ec2.AclTraffic.tcp_port(443),
-            direction=ec2.TrafficDirection.INGRESS,
-            rule_action=ec2.Action.ALLOW
-        )
-        # Inbound: ephemeral ports - return traffic from VPC endpoints (HTTPS responses)
-        nacl.add_entry("InboundEphemeral",
-            rule_number=110,
-            cidr=vpc_cidr,
-            traffic=ec2.AclTraffic.tcp_port_range(1024, 65535),
-            direction=ec2.TrafficDirection.INGRESS,
-            rule_action=ec2.Action.ALLOW
-        )
-
-        # Outbound: HTTPS to VPC endpoints (ECR, Secrets Manager, Kinesis, CloudWatch)
-        nacl.add_entry("OutboundHTTPS",
-            rule_number=100,
-            cidr=vpc_cidr,
-            traffic=ec2.AclTraffic.tcp_port(443),
-            direction=ec2.TrafficDirection.EGRESS,
-            rule_action=ec2.Action.ALLOW
-        )
-        # Outbound: ephemeral ports - return traffic back to ALB
-        nacl.add_entry("OutboundEphemeral",
-            rule_number=110,
-            cidr=vpc_cidr,
-            traffic=ec2.AclTraffic.tcp_port_range(1024, 65535),
-            direction=ec2.TrafficDirection.EGRESS,
-            rule_action=ec2.Action.ALLOW
         )

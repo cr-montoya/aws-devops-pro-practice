@@ -23,22 +23,22 @@ class ComputeStack(cdk.Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # API key stored in Secrets Manager — loaded by FastAPI at container startup
-        # The task role has grant_read so the container fetches it without hardcoding credentials
+        # API key in Secrets Manager — task role has grant_read so the container
+        # fetches it at startup without hardcoding credentials
         self.secret = secretsmanager.Secret(self, "ApiKeySecret",
             secret_name=f"{app_name}-{stage}-api-key",
             removal_policy=RemovalPolicy.DESTROY
         )
 
-        # ECS Cluster — ENHANCED container insights publishes CPU/memory/network metrics to CloudWatch
+        # ENHANCED container insights publishes CPU/memory/network metrics to CloudWatch
         self.cluster = ecs.Cluster(self, "Cluster",
             vpc=networking_stack.vpc,
             cluster_name=f"{app_name}-{stage}-cluster",
             container_insights_v2=ecs.ContainerInsights.ENHANCED
         )
 
-        # Task role — identity assumed by the running container (not the ECS agent)
-        # Follows least privilege: only the specific actions the FastAPI needs
+        # Task role — identity assumed by the running container (not the ECS agent).
+        # Least privilege: only the actions FastAPI needs at runtime.
         task_role = iam.Role(self, "TaskRole",
             assumed_by=iam.ServicePrincipal("ecs-tasks.amazonaws.com")
         )
@@ -47,18 +47,17 @@ class ComputeStack(cdk.Stack):
         storage_stack.table.grant_write_data(task_role)
         self.secret.grant_read(task_role)
 
-        # dev: tasks in public subnets with public IP (reaches ECR/AWS services directly over internet)
-        # prod: tasks in private isolated subnets, no public IP (VPC endpoints handle AWS service traffic)
+        # dev: public subnets + public IP (direct internet access to ECR/AWS services)
+        # prod: private isolated subnets + no public IP (VPC endpoints handle AWS traffic)
         task_subnets = (
             ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED)
             if networking_stack.is_production
             else ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC)
         )
 
-        # ApplicationLoadBalancedFargateService (L3 pattern):
-        # provisions ECS service + task definition + ALB + target group + listener in one construct
-        # circuit_breaker: stops deployment and rolls back after consecutive task launch failures
-        # instead of retrying for up to 3 hours (the default ECS behavior without circuit breaker)
+        # L3 pattern — provisions ECS service, task definition, ALB, target group and
+        # listener in one construct. circuit_breaker rolls back instead of retrying for
+        # up to 3 hours (default ECS behavior without it).
         self.service = ecs_patterns.ApplicationLoadBalancedFargateService(self, "Service",
             cluster=self.cluster,
             cpu=256,
@@ -83,20 +82,14 @@ class ComputeStack(cdk.Stack):
             min_healthy_percent=100,
         )
 
-        # ALB health check — ECS replaces tasks that fail this check
         self.service.target_group.configure_health_check(
             path="/health",
             healthy_http_codes="200"
         )
 
-        # prod: grant the task SG explicit access to the VPC interface endpoints.
-        # The endpoints_sg already allows HTTPS from the VPC CIDR, but Fargate in
-        # PRIVATE_ISOLATED subnets requires a task-SG-scoped rule for the endpoint
-        # private DNS to resolve correctly instead of falling back to public ECR IPs.
-        #
-        # CfnSecurityGroupIngress is placed in THIS (compute) stack to avoid a
-        # circular cross-stack dependency: compute already depends on networking
-        # (VPC/subnet refs), so networking cannot also depend on compute (task SG ref).
+        # prod: add task SG as explicit ingress on the VPC endpoints SG.
+        # CfnSecurityGroupIngress lives here (compute) to avoid a circular dependency —
+        # compute already imports networking via VPC refs, so networking cannot import back.
         if networking_stack.is_production:
             task_sg = self.service.service.connections.security_groups[0]
             ec2.CfnSecurityGroupIngress(self, "EndpointSgTaskIngress",
@@ -108,5 +101,4 @@ class ComputeStack(cdk.Stack):
                 description="HTTPS from ECS tasks to VPC endpoints"
             )
 
-        # Expose ALB for downstream stacks (observability alarms, incident response)
         self.alb = self.service.load_balancer

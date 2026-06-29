@@ -19,7 +19,7 @@ This repo contains two production-inspired AWS applications. Each app uses a sma
 - Model environment-specific behavior such as prod-only recovery and private workloads.
 - Keep the app domains simple enough that the DevOps decisions remain visible.
 - Preserve realistic operational concerns: IAM scope, observability, rollback, cost, and cleanup.
-- Document architecture decisions, operational runbooks, and demo evidence like a real portfolio project.
+- Document architecture decisions and operational runbooks like a real portfolio project.
 
 ## Architecture Overview
 
@@ -84,7 +84,6 @@ Use both when you want to compare how the same DevOps ideas show up across diffe
 |   |-- architecture/                 # Mermaid diagrams
 |   |-- adr/                          # Architecture decision records
 |   |-- runbooks/                     # Operational troubleshooting notes
-|   |-- demo/                         # Suggested demo evidence
 |   |-- costs.md
 |   `-- dop-c02-mapping.md
 |-- SAM/
@@ -170,7 +169,6 @@ Portfolio documentation lives in [docs/](docs/):
 - [Runbooks](docs/runbooks/)
 - [Cost guide](docs/costs.md)
 - [DOP-C02 mapping](docs/dop-c02-mapping.md)
-- [Demo evidence guide](docs/demo/)
 
 ## Cost Notes
 

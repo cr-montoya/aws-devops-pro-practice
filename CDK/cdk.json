@@ -16,7 +16,7 @@
   },
   "context": {
     "github_repo": "aws-devops-pro-practice",
-    "github_branch": "cdk",
+    "github_branch": "<BRANCH_NAME>",
     "@aws-cdk/aws-signer:signingProfileNamePassedToCfn": true,
     "@aws-cdk/aws-ecs-patterns:secGroupsDisablesImplicitOpenListener": true,
     "@aws-cdk/aws-lambda:recognizeLayerVersion": true,

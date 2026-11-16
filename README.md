@@ -29,26 +29,19 @@ This repo contains two production-inspired AWS applications. Each app uses a sma
 
 ## Architecture Overview
 
-```text
-aws-devops-pro-practice/
-|
-|-- SAM/
-|   `-- Task API
-|       |-- API Gateway REST API
-|       |-- Lambda functions per operation
-|       |-- DynamoDB task table
-|       |-- CloudWatch alarms and access logs
-|       `-- CodePipeline + CodeBuild + CloudFormation deploys
-|
-`-- CDK/
-    `-- Orders Platform
-        |-- ECS Fargate FastAPI service behind an ALB
-        |-- Kinesis Data Streams and Firehose
-        |-- Lambda stream processor and SQS DLQ
-        |-- DynamoDB processed state and S3 raw archive
-        |-- CloudWatch, SNS, EventBridge incident response
-        `-- Self-mutating CDK Pipeline
-```
+### SAM Task API
+
+[![SAM Task API architecture](docs/diagrams/sam-task-api.png)](docs/diagrams/sam-task-api.drawio)
+
+[Editable draw.io source](docs/diagrams/sam-task-api.drawio)
+
+### CDK Orders Platform
+
+[![CDK Orders Platform architecture](docs/diagrams/cdk-orders-platform.png)](docs/diagrams/cdk-orders-platform.drawio)
+
+[Editable draw.io source](docs/diagrams/cdk-orders-platform.drawio)
+
+[Diagram scope and export instructions](docs/diagrams/README.md).
 
 ## Reusable Patterns
 

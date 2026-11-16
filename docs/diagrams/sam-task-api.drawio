@@ -1,0 +1,107 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net">
+  <diagram name="SAM Task API | Serverless delivery" id="SAM">
+    <mxGraphModel page="1" pageWidth="1100" pageHeight="880" background="#ffffff">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="SAM Task API | Serverless delivery" parent="1" vertex="1" style="text;align=left;fontSize=26;fontStyle=1;">
+          <mxGeometry x="20" y="10" width="1060" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="cloud" value="AWS Cloud" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#94a3b8;verticalAlign=top;align=left;spacing=10;fontSize=15;fontStyle=1;">
+          <mxGeometry x="20" y="65" width="1060" height="795" as="geometry" />
+        </mxCell>
+        <mxCell id="region" value="Region: us-east-2 | separate dev and prod deployments" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#94a3b8;verticalAlign=top;align=left;spacing=10;fontSize=15;fontStyle=1;">
+          <mxGeometry x="35" y="105" width="1030" height="740" as="geometry" />
+        </mxCell>
+        <mxCell id="api" value="API Gateway&#10;API key + usage plan" parent="1" vertex="1" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.api_gateway;fillColor=#8C4FFF;strokeColor=#ffffff;labelWidth=190;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=14;fontColor=#172b4d;whiteSpace=wrap;">
+          <mxGeometry x="170" y="205" width="60" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="client" value="Client" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f4f6fa;strokeColor=#94a3b8;verticalAlign=top;align=left;spacing=10;fontSize=15;fontStyle=1;">
+          <mxGeometry x="65" y="215" width="70" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="fn" value="Lambda live aliases&#10;Health, Create, List, Get, Update" parent="1" vertex="1" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;fillColor=#ED7100;strokeColor=#ffffff;labelWidth=190;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=14;fontColor=#172b4d;whiteSpace=wrap;">
+          <mxGeometry x="450" y="205" width="60" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="db" value="DynamoDB tasks&#10;Prod: PITR + deletion protection" parent="1" vertex="1" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;fillColor=#C925D1;strokeColor=#ffffff;labelWidth=190;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=14;fontColor=#172b4d;whiteSpace=wrap;">
+          <mxGeometry x="850" y="205" width="60" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="1 HTTP" parent="1" source="client" target="api" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#2563eb;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="2 Route operation" parent="1" source="api" target="fn" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#2563eb;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="3 CRUD (except health)" parent="1" source="fn" target="db" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#2563eb;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="cw" value="CloudWatch&#10;API logs, 5XX / latency&#10;Function error alarms" parent="1" vertex="1" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudwatch;fillColor=#E7157B;strokeColor=#ffffff;labelWidth=190;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=14;fontColor=#172b4d;whiteSpace=wrap;">
+          <mxGeometry x="170" y="410" width="60" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="deploy" value="CodeDeploy&#10;Canary10Percent5Minutes" parent="1" vertex="1" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.codedeploy;fillColor=#C925D1;strokeColor=#ffffff;labelWidth=190;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=14;fontColor=#172b4d;whiteSpace=wrap;">
+          <mxGeometry x="450" y="410" width="60" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="xray" value="X-Ray&#10;API + Lambda tracing" parent="1" vertex="1" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.xray;fillColor=#C925D1;strokeColor=#ffffff;labelWidth=190;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=14;fontColor=#172b4d;whiteSpace=wrap;">
+          <mxGeometry x="850" y="410" width="60" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="4 Logs / metrics" parent="1" source="api" target="cw" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#64748b;dashed=1;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="4 Errors" parent="1" source="fn" target="cw" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#64748b;dashed=1;exitX=0.5;exitY=0;entryX=0.5;entryY=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="480" y="165" />
+              <mxPoint x="200" y="165" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" value="5 Function alarm rollback" parent="1" source="cw" target="deploy" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#64748b;dashed=1;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="6 Shift alias traffic" parent="1" source="deploy" target="fn" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#64748b;dashed=1;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="7 Traces" parent="1" source="fn" target="xray" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#64748b;dashed=1;exitX=0.5;exitY=0;entryX=0.5;entryY=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="590" y="355" />
+              <mxPoint x="880" y="355" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="delivery" value="Delivery | GitHub via CodeStar connection | CodePipeline" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f4f6fa;strokeColor=#94a3b8;verticalAlign=top;align=left;spacing=10;fontSize=15;fontStyle=1;">
+          <mxGeometry x="60" y="590" width="980" height="225" as="geometry" />
+        </mxCell>
+        <mxCell id="pipe" value="CodePipeline" parent="1" vertex="1" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.codepipeline;fillColor=#C925D1;strokeColor=#ffffff;labelWidth=190;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=14;fontColor=#172b4d;whiteSpace=wrap;">
+          <mxGeometry x="100" y="650" width="60" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="build" value="CodeBuild&#10;Validate, test, build, package" parent="1" vertex="1" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.codebuild;fillColor=#C925D1;strokeColor=#ffffff;labelWidth=190;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=14;fontColor=#172b4d;whiteSpace=wrap;">
+          <mxGeometry x="310" y="650" width="60" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="art" value="S3 artifacts" parent="1" vertex="1" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;fillColor=#C925D1;strokeColor=#ffffff;labelWidth=190;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=14;fontColor=#172b4d;whiteSpace=wrap;">
+          <mxGeometry x="560" y="650" width="60" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="cfn" value="CloudFormation&#10;Dev &gt; approval (SNS) &gt; prod" parent="1" vertex="1" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudformation;fillColor=#C925D1;strokeColor=#ffffff;labelWidth=190;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=14;fontColor=#172b4d;whiteSpace=wrap;">
+          <mxGeometry x="850" y="650" width="60" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="8 Source" parent="1" source="pipe" target="build" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#2563eb;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="9 Package" parent="1" source="build" target="art" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#2563eb;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="10 Change sets" parent="1" source="art" target="cfn" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#2563eb;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="11 Deploy" parent="1" source="cfn" target="deploy" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#64748b;dashed=1;exitX=0.5;exitY=0;entryX=0.5;entryY=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="880" y="570" />
+              <mxPoint x="480" y="570" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

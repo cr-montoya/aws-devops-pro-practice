@@ -1,5 +1,10 @@
 # SAM Task API Architecture
 
+[![Architecture](../diagrams/sam-task-api.png)](../diagrams/sam-task-api.drawio)
+
+[Editable draw.io source](../diagrams/sam-task-api.drawio). The Mermaid below remains a compact flow reference.
+
+
 ```mermaid
 flowchart TD
     Client[Client] --> APIGW[API Gateway REST API]

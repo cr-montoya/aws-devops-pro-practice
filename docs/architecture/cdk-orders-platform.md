@@ -1,5 +1,10 @@
 # CDK Orders Platform Architecture
 
+[![Architecture](../diagrams/cdk-orders-platform.png)](../diagrams/cdk-orders-platform.drawio)
+
+[Editable draw.io source](../diagrams/cdk-orders-platform.drawio). The Mermaid below remains a compact flow reference.
+
+
 ```mermaid
 flowchart TD
     Client[Client] --> ALB[Application Load Balancer]
